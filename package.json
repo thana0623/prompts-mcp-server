@@ -1,0 +1,26 @@
+{
+  "name": "prompts-mcp-server",
+  "version": "1.0.0",
+  "description": "通用 MCP Server — 自动生成项目 prompts 体系、传递链日志、模块记录、需求澄清与计划生成。可接入任意项目。",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "prompts-mcp": "build/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node build/index.js",
+    "cli": "node build/cli.js",
+    "dev": "tsx src/index.ts",
+    "dev:cli": "tsx src/cli.ts"
+  },
+  "keywords": ["mcp", "prompts", "cline", "project-init"],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

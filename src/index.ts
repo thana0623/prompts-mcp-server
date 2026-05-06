@@ -1,0 +1,758 @@
+#!/usr/bin/env node
+
+/**
+ * prompts-mcp-server - 通用 MCP Server
+ * 
+ * 提供以下工具：
+ *   - init_prompts       - 扫描项目，自动生成原始 prompts 体系
+ *   - bootstrap          - 一键启动，自动读取传递链 + 模块记录
+ *   - check_requirements - 需求澄清检查（5 项标准）
+ *   - make_plan          - 生成可行计划，等待用户确认
+ *   - log_dialog         - 记录对话日志（传递链）
+ *   - log_module         - 记录模块修改（目录式）
+ *   - read_module        - 修改前读取模块记录
+ *   - update_todos       - 更新待办事项
+ * 
+ * 通过环境变量 PROJECT_ROOT 指定目标项目路径。
+ */
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  ListToolsRequestSchema,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
+import {
+  bootstrap,
+  formatBootstrap,
+  loadContext,
+  loadDaily,
+  loadRecent5,
+  loadSummary10,
+  loadTodos,
+  loadWorkflowLog,
+  loadDevRules,
+  loadLogState,
+  getProjectRoot,
+  getPromptsDir,
+} from './prompts-loader.js';
+import {
+  initPrompts,
+} from './prompts-generator.js';
+import {
+  readModuleLog,
+  listModuleLogs,
+  appendModuleLog,
+} from './module-logger.js';
+import {
+  checkRequirements,
+  formatCheckResult,
+  generatePlan,
+  formatPlan,
+} from './requirements-check.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+class PromptsMcpServer {
+  private server: Server;
+
+  constructor() {
+    this.server = new Server(
+      {
+        name: 'prompts-mcp-server',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
+
+    this.setupToolHandlers();
+
+    this.server.onerror = (error: Error) => console.error('[MCP Error]', error);
+    process.on('SIGINT', async () => {
+      await this.server.close();
+      process.exit(0);
+    });
+  }
+
+  // ─── Tool Handlers ──────────────────────────────────────────────
+
+  private setupToolHandlers() {
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: [
+        {
+          name: 'init_prompts',
+          description: '【初始化】扫描目标项目，自动生成原始 prompts 体系（context.md / workflow-log.md / recent-5.md / summary-10.md / todos.md / dev-rules.md / modules/）。已有文件不会覆盖。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectRoot: {
+                type: 'string',
+                description: '目标项目根目录路径。不传则使用 PROJECT_ROOT 环境变量或当前目录。',
+              },
+            },
+          },
+        },
+        {
+          name: 'bootstrap',
+          description: '【一键启动】自动读取传递链（context.md + daily + recent-5 + summary-10 + todos + 模块记录）。智能体启动时第一步调用。',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'check_requirements',
+          description: '【需求澄清】执行 5 项需求明确标准检查。不明确时生成追问问题，禁止猜测执行。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              taskDescription: {
+                type: 'string',
+                description: '用户提出的任务需求描述',
+              },
+            },
+            required: ['taskDescription'],
+          },
+        },
+        {
+          name: 'make_plan',
+          description: '【生成计划】在需求已澄清（check_requirements 全部 ✅）后，生成可行执行计划，等待用户确认。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              taskDescription: {
+                type: 'string',
+                description: '已澄清的任务需求描述',
+              },
+            },
+            required: ['taskDescription'],
+          },
+        },
+        {
+          name: 'log_dialog',
+          description: '【记录日志】记录一次对话到传递链（daily + recent-5 + summary-10 + log-state.json）。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              title: {
+                type: 'string',
+                description: '对话简明标题',
+              },
+              request: {
+                type: 'string',
+                description: '清洗后的用户需求',
+              },
+              changes: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '代码变更文件列表',
+              },
+              decisions: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '本次技术决策',
+              },
+              todos: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '遗留待办项',
+              },
+            },
+            required: ['title', 'request'],
+          },
+        },
+        {
+          name: 'log_module',
+          description: '【模块记录】按模块记录一次修改（目录式）。修改功能前先 read_module，修改后调用此工具。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              moduleName: {
+                type: 'string',
+                description: '模块名称（如 auth、rag-upload、frontend）',
+              },
+              change: {
+                type: 'string',
+                description: '变更内容描述',
+              },
+              files: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '涉及的文件列表',
+              },
+              decisions: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '本次决策',
+              },
+            },
+            required: ['moduleName', 'change'],
+          },
+        },
+        {
+          name: 'read_module',
+          description: '【读取模块记录】修改功能前调用，读取对应模块的历史修改记录。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              moduleName: {
+                type: 'string',
+                description: '模块名称',
+              },
+            },
+            required: ['moduleName'],
+          },
+        },
+        {
+          name: 'update_todos',
+          description: '【更新待办】更新 todos.md 中的待办事项。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              action: {
+                type: 'string',
+                description: '操作类型: add（添加）/ complete（完成）/ remove（删除）',
+                enum: ['add', 'complete', 'remove'],
+              },
+              todo: {
+                type: 'string',
+                description: '待办事项内容',
+              },
+            },
+            required: ['action', 'todo'],
+          },
+        },
+      ],
+    }));
+
+    this.server.setRequestHandler(CallToolRequestSchema, async (request: { params: { name: string; arguments?: any } }) => {
+      const { name, arguments: args } = request.params;
+
+      switch (name) {
+        case 'init_prompts':
+          return this.handleInitPrompts(args);
+        case 'bootstrap':
+          return this.handleBootstrap();
+        case 'check_requirements':
+          return this.handleCheckRequirements(args);
+        case 'make_plan':
+          return this.handleMakePlan(args);
+        case 'log_dialog':
+          return this.handleLogDialog(args);
+        case 'log_module':
+          return this.handleLogModule(args);
+        case 'read_module':
+          return this.handleReadModule(args);
+        case 'update_todos':
+          return this.handleUpdateTodos(args);
+        default:
+          throw new McpError(
+            ErrorCode.MethodNotFound,
+            `Unknown tool: ${name}`
+          );
+      }
+    });
+  }
+
+  // ─── Tool Implementations ───────────────────────────────────────
+
+  /**
+   * init_prompts: 初始化 prompts 体系
+   */
+  private async handleInitPrompts(args: any) {
+    const projectRoot = typeof args?.projectRoot === 'string'
+      ? args.projectRoot
+      : getProjectRoot();
+
+    const result = initPrompts(projectRoot);
+
+    const lines: string[] = [];
+    lines.push('# 🚀 Prompts 体系初始化完成');
+    lines.push('');
+    lines.push(`**项目**: ${result.projectInfo.name}`);
+    lines.push(`**路径**: ${result.promptsDir}`);
+    lines.push('');
+
+    lines.push('## ✅ 已创建文件');
+    lines.push('');
+    for (const f of result.filesCreated) {
+      lines.push(`- \`${f}\``);
+    }
+    lines.push('');
+
+    lines.push('## 📋 检测到的项目信息');
+    lines.push('');
+    lines.push(`- 语言: ${result.projectInfo.languages.join(', ') || '未检测到'}`);
+    lines.push(`- 框架: ${result.projectInfo.frameworks.join(', ') || '未检测到'}`);
+    lines.push(`- 构建工具: ${result.projectInfo.buildTools.join(', ') || '未检测到'}`);
+    lines.push(`- 数据库: ${result.projectInfo.databases.join(', ') || '未检测到'}`);
+    lines.push(`- 前端: ${result.projectInfo.hasFrontend ? result.projectInfo.frontendFramework : '无'}`);
+    lines.push(`- 后端: ${result.projectInfo.hasBackend ? result.projectInfo.backendFramework : '无'}`);
+    lines.push('');
+
+    if (result.errors.length > 0) {
+      lines.push('## ⚠️ 错误');
+      lines.push('');
+      for (const e of result.errors) {
+        lines.push(`- ❌ ${e}`);
+      }
+      lines.push('');
+    }
+
+    lines.push('## 📖 下一步');
+    lines.push('');
+    lines.push('1. 检查生成的 prompts 文件，根据项目实际情况补充修改');
+    lines.push('2. 运行 `bootstrap` 验证加载正常');
+    lines.push('3. 开始开发时，先运行 `check_requirements` 澄清需求');
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+    };
+  }
+
+  /**
+   * bootstrap: 一键启动
+   */
+  private async handleBootstrap() {
+    const result = bootstrap();
+    const formatted = formatBootstrap(result);
+
+    return {
+      content: [{ type: 'text', text: formatted }],
+    };
+  }
+
+  /**
+   * check_requirements: 需求澄清检查
+   */
+  private async handleCheckRequirements(args: any) {
+    const taskDescription = typeof args?.taskDescription === 'string' ? args.taskDescription : '';
+    const result = checkRequirements(taskDescription);
+    const formatted = formatCheckResult(result);
+
+    return {
+      content: [{ type: 'text', text: formatted }],
+    };
+  }
+
+  /**
+   * make_plan: 生成可行计划
+   */
+  private async handleMakePlan(args: any) {
+    const taskDescription = typeof args?.taskDescription === 'string' ? args.taskDescription : '';
+
+    if (!taskDescription) {
+      return {
+        content: [{ type: 'text', text: '❌ 请提供任务需求描述。' }],
+        isError: true,
+      };
+    }
+
+    // 先检查需求是否明确
+    const checkResult = checkRequirements(taskDescription);
+    if (!checkResult.allClear) {
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ **需求尚未完全明确，无法生成计划。**\n\n以下项目不明确: ${checkResult.unclearItems.join('、')}\n\n请先使用 \`check_requirements\` 工具追问澄清，待所有 5 项标准都 ✅ 后再生成计划。`,
+        }],
+        isError: true,
+      };
+    }
+
+    const plan = generatePlan(taskDescription, checkResult);
+    const formatted = formatPlan(plan);
+
+    return {
+      content: [{ type: 'text', text: formatted }],
+    };
+  }
+
+  /**
+   * log_dialog: 记录对话日志
+   */
+  private async handleLogDialog(args: any) {
+    const title = typeof args?.title === 'string' ? args.title : '';
+    const request = typeof args?.request === 'string' ? args.request : '';
+    const changes: string[] = Array.isArray(args?.changes) ? args.changes : [];
+    const decisions: string[] = Array.isArray(args?.decisions) ? args.decisions : [];
+    const todos: string[] = Array.isArray(args?.todos) ? args.todos : [];
+
+    if (!title || !request) {
+      return {
+        content: [{ type: 'text', text: '❌ "title" 和 "request" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    try {
+      const promptsDir = getPromptsDir();
+      const today = new Date().toISOString().slice(0, 10);
+      const entryId = this.getNextEntryId(promptsDir);
+
+      // 1. 更新 daily 日志
+      this.appendDailyLog(promptsDir, today, entryId, title, request, changes, decisions, todos);
+
+      // 2. 更新 recent-5
+      this.updateRecent5(promptsDir, entryId, today, title, request, changes, decisions, todos);
+
+      // 3. 更新 summary-10
+      this.updateSummary10(promptsDir, entryId, today, request, changes, decisions, todos);
+
+      // 4. 更新 log-state.json
+      this.updateLogState(promptsDir, entryId, today, request, changes, decisions, todos);
+
+      // 5. 更新 todos.md（如果有待办）
+      if (todos.length > 0) {
+        this.appendTodos(promptsDir, todos);
+      }
+
+      return {
+        content: [{
+          type: 'text',
+          text: `✅ 对话日志已记录。\n\n- Entry-${String(entryId).padStart(3, '0')}\n- 日期: ${today}\n- 标题: ${title}\n- daily: 已追加\n- recent-5: 已更新\n- summary-10: 已更新`,
+        }],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: 'text', text: `❌ 记录日志失败: ${error.message || error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * log_module: 记录模块修改
+   */
+  private async handleLogModule(args: any) {
+    const moduleName = typeof args?.moduleName === 'string' ? args.moduleName : '';
+    const change = typeof args?.change === 'string' ? args.change : '';
+    const files: string[] = Array.isArray(args?.files) ? args.files : [];
+    const decisions: string[] = Array.isArray(args?.decisions) ? args.decisions : [];
+
+    if (!moduleName || !change) {
+      return {
+        content: [{ type: 'text', text: '❌ "moduleName" 和 "change" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    const projectRoot = getProjectRoot();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const result = appendModuleLog(projectRoot, moduleName, {
+      date: today,
+      change,
+      files,
+      decisions,
+    });
+
+    if (result.success) {
+      return {
+        content: [{ type: 'text', text: `✅ 模块记录已更新: ${moduleName}\n\n变更: ${change}\n日期: ${today}` }],
+      };
+    } else {
+      return {
+        content: [{ type: 'text', text: `❌ 更新模块记录失败: ${result.error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * read_module: 读取模块记录
+   */
+  private async handleReadModule(args: any) {
+    const moduleName = typeof args?.moduleName === 'string' ? args.moduleName : '';
+
+    if (!moduleName) {
+      return {
+        content: [{ type: 'text', text: '❌ "moduleName" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    const projectRoot = getProjectRoot();
+    const content = readModuleLog(projectRoot, moduleName);
+
+    return {
+      content: [{ type: 'text', text: `# 模块记录: ${moduleName}\n\n${content}` }],
+    };
+  }
+
+  /**
+   * update_todos: 更新待办事项
+   */
+  private async handleUpdateTodos(args: any) {
+    const action = typeof args?.action === 'string' ? args.action : '';
+    const todo = typeof args?.todo === 'string' ? args.todo : '';
+
+    if (!action || !todo) {
+      return {
+        content: [{ type: 'text', text: '❌ "action" 和 "todo" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    try {
+      const promptsDir = getPromptsDir();
+      const todosPath = path.join(promptsDir, 'todos.md');
+
+      let content = '';
+      if (fs.existsSync(todosPath)) {
+        content = fs.readFileSync(todosPath, 'utf-8');
+      } else {
+        content = `# 待办事项\n\n## 进行中\n\n*(暂无)*\n\n## 已完成\n\n*(暂无)*\n`;
+      }
+
+      switch (action) {
+        case 'add': {
+          // 在"进行中"区域添加
+          const inProgressMarker = '## 进行中';
+          const idx = content.indexOf(inProgressMarker);
+          if (idx !== -1) {
+            const afterMarker = content.indexOf('\n', idx) + 1;
+            content = content.slice(0, afterMarker) + `\n- [ ] ${todo}` + content.slice(afterMarker);
+          }
+          break;
+        }
+        case 'complete': {
+          // 将 - [ ] 改为 - [x] 并移到已完成
+          content = content.replace(`- [ ] ${todo}`, `- [x] ${todo}`);
+          break;
+        }
+        case 'remove': {
+          content = content.replace(`- [ ] ${todo}\n`, '');
+          content = content.replace(`- [x] ${todo}\n`, '');
+          break;
+        }
+      }
+
+      fs.writeFileSync(todosPath, content, 'utf-8');
+
+      return {
+        content: [{ type: 'text', text: `✅ 待办事项已更新: ${action} "${todo}"` }],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: 'text', text: `❌ 更新待办失败: ${error.message || error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  // ─── 内部日志方法 ───────────────────────────────────────────────
+
+  private getNextEntryId(promptsDir: string): number {
+    const statePath = path.join(promptsDir, 'log-state.json');
+    try {
+      if (fs.existsSync(statePath)) {
+        const state = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+        return state.nextEntryId || 1;
+      }
+    } catch { /* ignore */ }
+    return 1;
+  }
+
+  private appendDailyLog(
+    promptsDir: string, today: string, entryId: number,
+    title: string, request: string, changes: string[], decisions: string[], todos: string[]
+  ) {
+    const dailyDir = path.join(promptsDir, 'daily');
+    if (!fs.existsSync(dailyDir)) fs.mkdirSync(dailyDir, { recursive: true });
+
+    const dailyPath = path.join(dailyDir, `${today}.md`);
+    const entry = [
+      '',
+      `## Entry-${String(entryId).padStart(3, '0')}`,
+      `- 时间: ${new Date().toISOString()}`,
+      `- 标题: ${title}`,
+      `- 清洗后需求: ${request}`,
+      changes.length > 0 ? `- 代码变更: ${changes.join(', ')}` : '',
+      decisions.length > 0 ? `- 技术决策: ${decisions.join('; ')}` : '',
+      todos.length > 0 ? `- 待办: ${todos.join('; ')}` : '',
+      '',
+    ].filter(Boolean).join('\n');
+
+    fs.appendFileSync(dailyPath, entry, 'utf-8');
+  }
+
+  private updateRecent5(
+    promptsDir: string, entryId: number, today: string,
+    title: string, request: string, changes: string[], decisions: string[], todos: string[]
+  ) {
+    const recentPath = path.join(promptsDir, 'recent-5.md');
+    const newEntry = [
+      `## Entry-${String(entryId).padStart(3, '0')}`,
+      `- 日期: ${today}`,
+      `- 清洗后需求: ${request}`,
+      changes.length > 0 ? `- 代码变更:\n${changes.map(c => `  - ${c}`).join('\n')}` : '- 代码变更: (无)',
+      decisions.length > 0 ? `- 技术决策:\n${decisions.map(d => `  - ${d}`).join('\n')}` : '- 技术决策: (无)',
+      todos.length > 0 ? `- 待办:\n${todos.map(t => `  - ${t}`).join('\n')}` : '- 待办: (无)',
+      '',
+    ].join('\n');
+
+    // 读取现有内容，保留 header，追加新条目，只保留最近 5 条
+    let content = '';
+    if (fs.existsSync(recentPath)) {
+      content = fs.readFileSync(recentPath, 'utf-8');
+    }
+
+    // 提取 header（第一个 ## 之前的内容）
+    const headerMatch = content.match(/^.*?(?=\n## Entry-)/s);
+    const header = headerMatch ? headerMatch[0].trim() : `# 最近 5 条对话与操作（动态窗口）\n\n> 规则：每次新增 1 条，超过 5 条时删除最旧 1 条，仅保留最近 5 条。\n`;
+
+    // 提取现有条目
+    const entries = content.split(/\n(?=## Entry-)/).filter(e => e.startsWith('## Entry-'));
+    entries.push(newEntry);
+
+    // 只保留最近 5 条
+    const recentEntries = entries.slice(-5);
+
+    const updated = `${header}\n\n${recentEntries.join('\n')}\n`;
+    fs.writeFileSync(recentPath, updated, 'utf-8');
+  }
+
+  private updateSummary10(
+    promptsDir: string, entryId: number, today: string,
+    request: string, changes: string[], decisions: string[], todos: string[]
+  ) {
+    const summaryPath = path.join(promptsDir, 'summary-10.md');
+    let content = '';
+    if (fs.existsSync(summaryPath)) {
+      content = fs.readFileSync(summaryPath, 'utf-8');
+    }
+
+    if (!content) {
+      content = `# 近 10 条对话状态摘要（Stateful）\n\n## 窗口元数据\n- window_id: W-0001\n- 统计范围: Entry-001 ~ Entry-010\n- 当前已收录: 0 / 10\n\n## Stateful 摘要\n### Current State\n- 项目初始化完成。\n\n### Decisions Kept\n- (暂无)\n\n### Invalidated Decisions\n- (暂无)\n\n### Open TODO\n- (暂无)\n\n### Carry Forward\n- (暂无)\n`;
+    }
+
+    // 更新窗口计数
+    const countMatch = content.match(/当前已收录:\s*(\d+)\s*\/\s*10/);
+    let count = countMatch ? parseInt(countMatch[1]) : 0;
+    count = Math.min(count + 1, 10);
+
+    content = content.replace(/当前已收录:\s*\d+\s*\/\s*10/, `当前已收录: ${count} / 10`);
+
+    // 更新 Current State
+    const stateSection = content.match(/### Current State\n([\s\S]*?)(?=\n### Decisions Kept)/);
+    if (stateSection) {
+      const newState = `### Current State\n- Entry-${String(entryId).padStart(3, '0')} (${today}): ${request}\n- Window progress: ${count}/10`;
+      content = content.replace(/### Current State\n[\s\S]*?(?=\n### Decisions Kept)/, newState + '\n');
+    }
+
+    // 更新 Decisions Kept
+    if (decisions.length > 0) {
+      const keptSection = content.match(/### Decisions Kept\n([\s\S]*?)(?=\n### Invalidated Decisions)/);
+      if (keptSection) {
+        const newDecisions = decisions.map(d => `- ${d}`).join('\n');
+        const existingDecisions = keptSection[1].trim();
+        if (existingDecisions === '(暂无)') {
+          content = content.replace(/### Decisions Kept\n\(暂无\)/, `### Decisions Kept\n${newDecisions}`);
+        } else {
+          content = content.replace(/### Decisions Kept\n[\s\S]*?(?=\n### Invalidated Decisions)/,
+            `### Decisions Kept\n${existingDecisions}\n${newDecisions}\n`);
+        }
+      }
+    }
+
+    // 更新 Open TODO
+    if (todos.length > 0) {
+      const todoSection = content.match(/### Open TODO\n([\s\S]*?)(?=\n### Carry Forward)/);
+      if (todoSection) {
+        const newTodos = todos.map(t => `- ${t}`).join('\n');
+        const existingTodos = todoSection[1].trim();
+        if (existingTodos === '(暂无)') {
+          content = content.replace(/### Open TODO\n\(暂无\)/, `### Open TODO\n${newTodos}`);
+        } else {
+          content = content.replace(/### Open TODO\n[\s\S]*?(?=\n### Carry Forward)/,
+            `### Open TODO\n${existingTodos}\n${newTodos}\n`);
+        }
+      }
+    }
+
+    fs.writeFileSync(summaryPath, content, 'utf-8');
+  }
+
+  private updateLogState(
+    promptsDir: string, entryId: number, today: string,
+    request: string, changes: string[], decisions: string[], todos: string[]
+  ) {
+    const statePath = path.join(promptsDir, 'log-state.json');
+    let state: any = {
+      nextEntryId: 1,
+      windowId: 'W-0001',
+      windowStartEntry: 1,
+      windowCount: 0,
+      windowEntries: [],
+    };
+
+    if (fs.existsSync(statePath)) {
+      try {
+        state = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+      } catch { /* use default */ }
+    }
+
+    // 添加新条目
+    state.windowEntries.push({
+      id: entryId,
+      date: today,
+      request,
+      changes,
+      decisions,
+      todos,
+    });
+
+    state.windowCount = state.windowEntries.length;
+    state.nextEntryId = entryId + 1;
+
+    // 如果达到 10 条，滚动窗口
+    if (state.windowCount >= 10) {
+      const windowNum = parseInt(state.windowId.replace('W-', '')) || 1;
+      state.windowId = `W-${String(windowNum + 1).padStart(4, '0')}`;
+      state.windowStartEntry = entryId + 1;
+      state.windowCount = 0;
+      state.windowEntries = [];
+    }
+
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
+  }
+
+  private appendTodos(promptsDir: string, todos: string[]) {
+    const todosPath = path.join(promptsDir, 'todos.md');
+    let content = '';
+    if (fs.existsSync(todosPath)) {
+      content = fs.readFileSync(todosPath, 'utf-8');
+    } else {
+      content = `# 待办事项\n\n## 进行中\n\n*(暂无)*\n\n## 已完成\n\n*(暂无)*\n`;
+    }
+
+    const inProgressMarker = '## 进行中';
+    const idx = content.indexOf(inProgressMarker);
+    if (idx !== -1) {
+      const afterMarker = content.indexOf('\n', idx) + 1;
+      const newTodos = todos.map(t => `- [ ] ${t}`).join('\n');
+      content = content.slice(0, afterMarker) + `\n${newTodos}` + content.slice(afterMarker);
+    }
+
+    fs.writeFileSync(todosPath, content, 'utf-8');
+  }
+
+  // ─── Run ────────────────────────────────────────────────────────
+
+  async run() {
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    console.error('Prompts MCP Server running on stdio');
+    console.error(`Project root: ${getProjectRoot()}`);
+  }
+}
+
+const server = new PromptsMcpServer();
+server.run().catch(console.error);
