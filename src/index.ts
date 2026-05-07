@@ -2,17 +2,22 @@
 
 /**
  * prompts-mcp-server - 通用 MCP Server
- * 
+ *
  * 提供以下工具：
+ *   - auto_start         - 会话自动启动，加载全部上下文 + 规则
  *   - init_prompts       - 扫描项目，自动生成原始 prompts 体系
  *   - bootstrap          - 一键启动，自动读取传递链 + 模块记录
  *   - check_requirements - 需求澄清检查（5 项标准）
  *   - make_plan          - 生成可行计划，等待用户确认
- *   - log_dialog         - 记录对话日志（传递链）
+ *   - log_dialog         - 记录对话日志（传递链 + 自动 git commit）
  *   - log_module         - 记录模块修改（目录式）
  *   - read_module        - 修改前读取模块记录
  *   - update_todos       - 更新待办事项
- * 
+ *   - add_rule           - 添加项目规范规则
+ *   - list_rules         - 列出所有自定义规则
+ *   - remove_rule        - 删除一条规则
+ *   - commit_dialog      - 手动触发 git commit
+ *
  * 通过环境变量 PROJECT_ROOT 指定目标项目路径。
  */
 
@@ -51,6 +56,17 @@ import {
   generatePlan,
   formatPlan,
 } from './requirements-check.js';
+import {
+  addRule,
+  removeRule,
+  listRules,
+  readRule,
+} from './rules-manager.js';
+import {
+  gitAutoCommit,
+  gitStatus,
+  isGitRepo,
+} from './git-utils.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -227,6 +243,77 @@ class PromptsMcpServer {
             required: ['action', 'todo'],
           },
         },
+        {
+          name: 'auto_start',
+          description: '【自动启动】会话开始时第一个调用。一键加载全部上下文（context + daily + recent-5 + summary-10 + todos + dev-rules + 用户规则 + 模块记录）。每次新对话开始时必须调用此工具。',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'add_rule',
+          description: '【添加规则】添加一条项目规范规则。规则会持久化存储，在每次会话启动时自动加载。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: '规则名称（如 commit-style、naming-convention）',
+              },
+              content: {
+                type: 'string',
+                description: '规则内容',
+              },
+              category: {
+                type: 'string',
+                description: '分类（如 frontend / backend / general / testing）',
+              },
+            },
+            required: ['name', 'content'],
+          },
+        },
+        {
+          name: 'list_rules',
+          description: '【列出规则】列出所有已添加的项目规范规则。',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'remove_rule',
+          description: '【删除规则】删除一条项目规范规则。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: '要删除的规则名称',
+              },
+            },
+            required: ['name'],
+          },
+        },
+        {
+          name: 'commit_dialog',
+          description: '【手动提交】手动触发一次 git commit。可指定要提交的文件，不指定则提交所有变更。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              message: {
+                type: 'string',
+                description: '提交信息',
+              },
+              files: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '要提交的文件列表（不指定则提交所有变更）',
+              },
+            },
+            required: ['message'],
+          },
+        },
       ],
     }));
 
@@ -250,6 +337,16 @@ class PromptsMcpServer {
           return this.handleReadModule(args);
         case 'update_todos':
           return this.handleUpdateTodos(args);
+        case 'auto_start':
+          return this.handleAutoStart();
+        case 'add_rule':
+          return this.handleAddRule(args);
+        case 'list_rules':
+          return this.handleListRules();
+        case 'remove_rule':
+          return this.handleRemoveRule(args);
+        case 'commit_dialog':
+          return this.handleCommitDialog(args);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,
@@ -412,10 +509,22 @@ class PromptsMcpServer {
         this.appendTodos(promptsDir, todos);
       }
 
+      // 6. 自动 git commit（如果开启）
+      let commitInfo = '';
+      if (config.autoCommit && isGitRepo()) {
+        const commitMsg = `dialog: Entry-${String(entryId).padStart(3, '0')} — ${title}`;
+        const commitResult = gitAutoCommit(commitMsg);
+        if (commitResult.success) {
+          commitInfo = `\n- git commit: ✅ ${commitResult.hash}`;
+        } else {
+          commitInfo = `\n- git commit: ⚠️ ${commitResult.error}`;
+        }
+      }
+
       return {
         content: [{
           type: 'text',
-          text: `✅ 对话日志已记录。\n\n- Entry-${String(entryId).padStart(3, '0')}\n- 日期: ${today}\n- 标题: ${title}\n- daily: 已追加\n- recent-5: 已更新\n- summary-10: 已更新`,
+          text: `✅ 对话日志已记录。\n\n- Entry-${String(entryId).padStart(3, '0')}\n- 日期: ${today}\n- 标题: ${title}\n- daily: 已追加\n- recent-5: 已更新\n- summary-10: 已更新${commitInfo}`,
         }],
       };
     } catch (error: any) {
@@ -541,6 +650,164 @@ class PromptsMcpServer {
     } catch (error: any) {
       return {
         content: [{ type: 'text', text: `❌ 更新待办失败: ${error.message || error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  // ─── 新增工具实现 ───────────────────────────────────────────────
+
+  /**
+   * auto_start: 会话自动启动
+   */
+  private async handleAutoStart() {
+    const result = bootstrap();
+    const formatted = formatBootstrap(result);
+
+    const lines: string[] = [];
+    lines.push('# 🚀 会话已自动启动');
+    lines.push('');
+    lines.push('> 以下为当前项目的完整上下文，请基于此开始工作。');
+    lines.push('');
+    lines.push(formatted);
+
+    // 补充 dev-rules 全文
+    if (result.devRules.content) {
+      lines.push('## 📐 开发规范（完整）');
+      lines.push('');
+      lines.push(result.devRules.content);
+      lines.push('');
+    }
+
+    // 补充用户规则全文
+    if (result.userRules) {
+      lines.push('## 📝 用户自定义规则（完整）');
+      lines.push('');
+      lines.push(result.userRules);
+      lines.push('');
+    }
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+    };
+  }
+
+  /**
+   * add_rule: 添加项目规范规则
+   */
+  private async handleAddRule(args: any) {
+    const name = typeof args?.name === 'string' ? args.name : '';
+    const content = typeof args?.content === 'string' ? args.content : '';
+    const category = typeof args?.category === 'string' ? args.category : 'general';
+
+    if (!name || !content) {
+      return {
+        content: [{ type: 'text', text: '❌ "name" 和 "content" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    const result = addRule(name, content, category);
+    if (result.success) {
+      return {
+        content: [{ type: 'text', text: `✅ 规则已添加: ${name}\n\n分类: ${category}\n内容:\n${content}` }],
+      };
+    } else {
+      return {
+        content: [{ type: 'text', text: `❌ 添加规则失败: ${result.error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * list_rules: 列出所有规则
+   */
+  private async handleListRules() {
+    const rules = listRules();
+
+    if (rules.length === 0) {
+      return {
+        content: [{ type: 'text', text: '📋 暂无自定义规则。\n\n使用 `add_rule` 工具添加规则。' }],
+      };
+    }
+
+    const lines: string[] = [];
+    lines.push('📋 项目自定义规则列表');
+    lines.push('');
+    lines.push('| 名称 | 分类 | 创建日期 |');
+    lines.push('|------|------|----------|');
+    for (const rule of rules) {
+      lines.push(`| ${rule.meta.name} | ${rule.meta.category} | ${rule.meta.created} |`);
+    }
+    lines.push('');
+    lines.push(`共 ${rules.length} 条规则`);
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+    };
+  }
+
+  /**
+   * remove_rule: 删除规则
+   */
+  private async handleRemoveRule(args: any) {
+    const name = typeof args?.name === 'string' ? args.name : '';
+
+    if (!name) {
+      return {
+        content: [{ type: 'text', text: '❌ "name" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    const result = removeRule(name);
+    if (result.success) {
+      return {
+        content: [{ type: 'text', text: `✅ 规则已删除: ${name}` }],
+      };
+    } else {
+      return {
+        content: [{ type: 'text', text: `❌ 删除规则失败: ${result.error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * commit_dialog: 手动 git commit
+   */
+  private async handleCommitDialog(args: any) {
+    const message = typeof args?.message === 'string' ? args.message : '';
+    const files: string[] = Array.isArray(args?.files) ? args.files : [];
+
+    if (!message) {
+      return {
+        content: [{ type: 'text', text: '❌ "message" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    if (!isGitRepo()) {
+      return {
+        content: [{ type: 'text', text: '❌ 当前目录不是 git 仓库。' }],
+        isError: true,
+      };
+    }
+
+    const result = gitAutoCommit(message, files.length > 0 ? files : undefined);
+
+    if (result.success) {
+      const status = gitStatus();
+      return {
+        content: [{
+          type: 'text',
+          text: `✅ Git 提交成功。\n\n- 提交信息: ${message}\n- Commit: ${result.hash}\n- 分支: ${status?.branch || 'unknown'}`,
+        }],
+      };
+    } else {
+      return {
+        content: [{ type: 'text', text: `❌ Git 提交失败: ${result.error}` }],
         isError: true,
       };
     }

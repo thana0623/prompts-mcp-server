@@ -48,6 +48,9 @@ export const config = {
 
   /** MCP Server 版本 */
   serverVersion: process.env.MCP_SERVER_VERSION || '1.0.0',
+
+  /** 是否在 log_dialog 后自动 git commit（默认开启） */
+  autoCommit: process.env.AUTO_COMMIT !== 'false',
 };
 
 // ─── 路径辅助函数 ─────────────────────────────────────────────────────
