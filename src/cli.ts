@@ -20,9 +20,8 @@
 import {
   bootstrap,
   formatBootstrap,
-  getProjectRoot,
-  getPromptsDir,
 } from './prompts-loader.js';
+import { getProjectRoot, getPromptsDir } from './config.js';
 import {
   initPrompts,
 } from './prompts-generator.js';

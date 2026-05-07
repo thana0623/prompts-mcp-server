@@ -8,6 +8,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { config, getPromptsDir } from './config.js';
 
 // ─── 类型定义 ────────────────────────────────────────────────────────
 
@@ -326,11 +327,11 @@ ${info.hasBackend ? `
 
 ## 4. 对话日志索引
 
-- 最近 5 条动态窗口: .github/prompts/recent-5.md
-- 近 10 条 Stateful 摘要: .github/prompts/summary-10.md
-- 工作流规范: .github/prompts/workflow-log.md
-- 模块记录: .github/prompts/modules/
-- 待办事项: .github/prompts/todos.md
+- 最近 5 条动态窗口: ${config.promptsSubDir}/recent-5.md
+- 近 10 条 Stateful 摘要: ${config.promptsSubDir}/summary-10.md
+- 工作流规范: ${config.promptsSubDir}/workflow-log.md
+- 模块记录: ${config.promptsSubDir}/modules/
+- 待办事项: ${config.promptsSubDir}/todos.md
 `;
 }
 
@@ -346,28 +347,28 @@ export function generateWorkflowLogMd(): string {
 - 每条对话统一执行：清洗 -> 提取 -> 归档/压缩。
 
 ## 文件职责
-- \`.github/prompts/daily/YYYY-MM-DD.md\`
+- \`${config.promptsSubDir}/daily/YYYY-MM-DD.md\`
   - 保存当日全量原始记录（可读、可追溯）。
-- \`.github/prompts/recent-5.md\`
+- \`${config.promptsSubDir}/recent-5.md\`
   - 保存最近 5 条清洗后的结构化记录。
-- \`.github/prompts/summary-10.md\`
+- \`${config.promptsSubDir}/summary-10.md\`
   - 保存 10 条窗口的有状态摘要与窗口元信息。
-- \`.github/prompts/context.md\`
+- \`${config.promptsSubDir}/context.md\`
   - 仅保留索引、全局技术栈、关键决策与待办。
-- \`.github/prompts/modules/<module-name>.md\`
+- \`${config.promptsSubDir}/modules/<module-name>.md\`
   - 按模块记录每一项修改（目录式）。
-- \`.github/prompts/todos.md\`
+- \`${config.promptsSubDir}/todos.md\`
   - 待办事项列表。
 
 ## 执行纪律
 
-1. 每次处理新请求，先读取 \`.github/prompts/context.md\`，确认当前全局状态。
-2. 再加载 \`.github/prompts/daily/YYYY-MM-DD.md\`（当日）和 \`.github/prompts/recent-5.md\`（最新 5 条），了解最新的对话和决策。
+1. 每次处理新请求，先读取 \`${config.promptsSubDir}/context.md\`，确认当前全局状态。
+2. 再加载 \`${config.promptsSubDir}/daily/YYYY-MM-DD.md\`（当日）和 \`${config.promptsSubDir}/recent-5.md\`（最新 5 条），了解最新的对话和决策。
 3. 按任务类型加载最相关的 prompt 文件，避免只看局部上下文就直接动手。
 4. 如果需求表达模糊、缺少边界、缺少验收条件，**立刻停止**，先追问；一轮不够就继续追问。
 5. 在需求明确前，**禁止**直接设计实现方案，**禁止**写代码，**禁止**做假设。
 6. 只有在明确"要做什么、为什么做、做到什么程度"之后，才能进入设计与编码。
-7. 修改功能前，先读取对应模块的模块记录（\`.github/prompts/modules/<module>.md\`）。
+7. 修改功能前，先读取对应模块的模块记录（\`${config.promptsSubDir}/modules/<module>.md\`）。
 
 ## 需求澄清的硬约束
 
@@ -434,7 +435,7 @@ export function generateWorkflowLogMd(): string {
 - 每次更新时都检查格式一致性，避免重复或遗漏。
 
 ### Step 5：模块记录
-- 如果本次修改涉及特定模块，同步更新 \`.github/prompts/modules/<module>.md\`
+- 如果本次修改涉及特定模块，同步更新 \`${config.promptsSubDir}/modules/<module>.md\`
 - 记录内容：修改时间、变更内容、涉及文件、决策
 
 ### Step 6：实时供给智能体
@@ -487,7 +488,7 @@ export function generateSummary10Md(): string {
 - 统计范围: Entry-001 ~ Entry-010
 - 当前已收录: 0 / 10
 - 数据来源:
-  - .github/prompts/recent-5.md
+  - ${config.promptsSubDir}/recent-5.md
 
 ## Stateful 摘要
 ### Current State
@@ -662,8 +663,8 @@ export function initPrompts(projectRoot: string): InitResult {
   // 扫描项目
   const info = scanProject(projectRoot);
 
-  // 创建 .github/prompts 目录
-  const promptsDir = path.join(projectRoot, '.github', 'prompts');
+  // 创建 prompts 目录
+  const promptsDir = getPromptsDir();
   const dirsToCreate = [
     promptsDir,
     path.join(promptsDir, 'daily'),

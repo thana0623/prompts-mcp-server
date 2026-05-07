@@ -9,6 +9,8 @@
  * 3. 等待用户确认计划后再执行
  */
 
+import { config } from './config.js';
+
 // ─── 5 项检查标准 ────────────────────────────────────────────────────
 
 export interface ClarityCheckItem {
@@ -267,7 +269,7 @@ export function generatePlan(
     order: order++,
     action: '文档同步',
     details: '更新对应模块的 docs 文档和模块记录',
-    estimatedFiles: ['docs/**', '.github/prompts/modules/**'],
+    estimatedFiles: ['docs/**', `${config.promptsSubDir}/modules/**`],
   });
 
   // 测试
@@ -283,7 +285,7 @@ export function generatePlan(
     order: order++,
     action: '日志记录',
     details: '记录本次对话日志（daily + recent-5 + summary-10 + 模块记录）',
-    estimatedFiles: ['.github/prompts/**'],
+    estimatedFiles: [`${config.promptsSubDir}/**`],
   });
 
   return {

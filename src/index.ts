@@ -35,9 +35,8 @@ import {
   loadWorkflowLog,
   loadDevRules,
   loadLogState,
-  getProjectRoot,
-  getPromptsDir,
 } from './prompts-loader.js';
+import { config, getProjectRoot, getPromptsDir } from './config.js';
 import {
   initPrompts,
 } from './prompts-generator.js';
@@ -61,8 +60,8 @@ class PromptsMcpServer {
   constructor() {
     this.server = new Server(
       {
-        name: 'prompts-mcp-server',
-        version: '1.0.0',
+        name: config.serverName,
+        version: config.serverVersion,
       },
       {
         capabilities: {

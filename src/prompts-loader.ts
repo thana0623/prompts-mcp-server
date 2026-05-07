@@ -1,29 +1,15 @@
 /**
  * prompts-loader.ts
- * 
+ *
  * 通用 prompts 加载模块。
  * 通过环境变量 PROJECT_ROOT 指定目标项目路径，完全解耦。
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { getProjectRoot, getPromptsDir } from './config.js';
 
-// ─── 路径解析 ────────────────────────────────────────────────────────
-
-/**
- * 获取目标项目根目录
- * 通过环境变量 PROJECT_ROOT 指定，默认为当前工作目录
- */
-export function getProjectRoot(): string {
-  return process.env.PROJECT_ROOT || process.cwd();
-}
-
-/**
- * 获取 .github/prompts 目录
- */
-export function getPromptsDir(): string {
-  return path.join(getProjectRoot(), '.github', 'prompts');
-}
+export { getProjectRoot, getPromptsDir };
 
 // ─── 文件读取 ────────────────────────────────────────────────────────
 
