@@ -3,37 +3,37 @@
 > Auto-generated from PostToolUse hooks. Do not edit manually.
 > Showing last 5 state-changing events.
 
-## Event-004
+## Event-087
 
-- **Time**: 2026-05-08 04:36:00
-- **Tool**: `Edit`
-- **Target**: `C:\admin\Code\Project\prompts-mcp-server\.claude\hooks\session-end.sh`
-- **Summary**: Modified .claude/hooks/session-end.sh (added process-logs call)
+- **Time**: 2026-05-08 05:48:01
+- **Tool**: `Bash`
+- **Target**: `ls "C:/admin/Code/Project/prompts-mcp-server/node_modules/" 2>/dev/null | head -30`
+- **Summary**: Ran: ls "C:/admin/Code/Project/prompts-mcp-server/node_modules/" 2>/dev/null | head -30
 
-## Event-005
+## Event-088
 
-- **Time**: 2026-05-08 04:36:30
-- **Tool**: `Edit`
-- **Target**: `C:\admin\Code\Project\prompts-mcp-server\CLAUDE.md`
-- **Summary**: Updated CLAUDE.md Phase 3 docs
+- **Time**: 2026-05-08 05:48:02
+- **Tool**: `Bash`
+- **Target**: `find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "*.node" -type f 2>/dev/null | head -20`
+- **Summary**: Ran: find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "*.node" -type f 2>/dev/null | he
 
-## Event-006
+## Event-089
 
-- **Time**: 2026-05-08 04:37:00
-- **Tool**: `Edit`
-- **Target**: `C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json`
-- **Summary**: Added PostToolUse hook to settings
+- **Time**: 2026-05-08 05:48:02
+- **Tool**: `Bash`
+- **Target**: `find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "binding.gyp" -type f 2>/dev/null | head -20`
+- **Summary**: Ran: find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "binding.gyp" -type f 2>/dev/null
 
-## Event-007
+## Event-090
 
-- **Time**: 2026-05-08 04:37:03
-- **Tool**: `Write`
-- **Target**: `C:\admin\Code\Project\prompts-mcp-server\logs\dialogs\2026-05-08.jsonl`
-- **Summary**: Created/rewrote C:\admin\Code\Project\prompts-mcp-server\logs\dialogs\2026-05-08.jsonl
+- **Time**: 2026-05-08 05:54:11
+- **Tool**: `Bash`
+- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && npm pack --dry-run 2>&1`
+- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && npm pack --dry-run 2>&1
 
-## Event-008
+## Event-091
 
-- **Time**: 2026-05-08 04:38:14
-- **Tool**: `Write`
-- **Target**: `C:\admin\Code\Project\prompts-mcp-server\.github\prompts\log-state.json`
-- **Summary**: Created/rewrote C:\admin\Code\Project\prompts-mcp-server\.github\prompts\log-state.json
+- **Time**: 2026-05-08 05:54:35
+- **Tool**: `Bash`
+- **Target**: `head -1 "C:/admin/Code/Project/prompts-mcp-server/build/cli.js"`
+- **Summary**: Ran: head -1 "C:/admin/Code/Project/prompts-mcp-server/build/cli.js"
