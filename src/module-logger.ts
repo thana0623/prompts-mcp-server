@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { getModulesDir } from './config.js';
 
 // ─── 类型定义 ────────────────────────────────────────────────────────
 
@@ -25,10 +26,6 @@ export interface ModuleLog {
 }
 
 // ─── 路径 ────────────────────────────────────────────────────────────
-
-function getModulesDir(projectRoot: string): string {
-  return path.join(projectRoot, '.github', 'prompts', 'modules');
-}
 
 function getModulePath(projectRoot: string, moduleName: string): string {
   return path.join(getModulesDir(projectRoot), `${moduleName}.md`);

@@ -1,29 +1,16 @@
 /**
  * prompts-loader.ts
- * 
+ *
  * 通用 prompts 加载模块。
  * 通过环境变量 PROJECT_ROOT 指定目标项目路径，完全解耦。
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { getProjectRoot, getPromptsDir } from './config.js';
+import { loadAllRules } from './rules-manager.js';
 
-// ─── 路径解析 ────────────────────────────────────────────────────────
-
-/**
- * 获取目标项目根目录
- * 通过环境变量 PROJECT_ROOT 指定，默认为当前工作目录
- */
-export function getProjectRoot(): string {
-  return process.env.PROJECT_ROOT || process.cwd();
-}
-
-/**
- * 获取 .github/prompts 目录
- */
-export function getPromptsDir(): string {
-  return path.join(getProjectRoot(), '.github', 'prompts');
-}
+export { getProjectRoot, getPromptsDir };
 
 // ─── 文件读取 ────────────────────────────────────────────────────────
 
@@ -74,6 +61,8 @@ export interface BootstrapResult {
   recent5: LoadedContext;
   summary10: LoadedContext;
   todos: LoadedContext;
+  devRules: LoadedContext;
+  userRules: string;
   logState: LogState | null;
   modules: string[];
 }
@@ -146,10 +135,12 @@ export function bootstrap(): BootstrapResult {
   const recent5 = loadRecent5();
   const summary10 = loadSummary10();
   const todos = loadTodos();
+  const devRules = loadDevRules();
+  const userRules = loadAllRules();
   const logState = loadLogState();
   const modules = listModules();
 
-  return { context, daily, recent5, summary10, todos, logState, modules };
+  return { context, daily, recent5, summary10, todos, devRules, userRules, logState, modules };
 }
 
 /**
@@ -167,6 +158,8 @@ export function formatBootstrap(result: BootstrapResult): string {
   lines.push(`✓ recent-5.md: ${result.recent5.content ? '已加载' : '未找到'}`);
   lines.push(`✓ summary-10.md: ${result.summary10.content ? '已加载' : '未找到'}`);
   lines.push(`✓ todos.md: ${result.todos.content ? '已加载' : '未找到'}`);
+  lines.push(`✓ dev-rules.md: ${result.devRules.content ? '已加载' : '未找到'}`);
+  lines.push(`✓ 用户规则: ${result.userRules ? '已加载' : '无'}`);
   lines.push(`✓ 模块记录: ${result.modules.length > 0 ? result.modules.join(', ') : '无'}`);
   lines.push('');
 
@@ -201,6 +194,24 @@ export function formatBootstrap(result: BootstrapResult): string {
     lines.push('## 📝 待办事项');
     lines.push('');
     lines.push(result.todos.content);
+    lines.push('');
+  }
+
+  // Dev Rules
+  if (result.devRules.content) {
+    lines.push('## 📐 开发规范');
+    lines.push('');
+    const ruleLines = result.devRules.content.split('\n').slice(0, 15);
+    lines.push(...ruleLines);
+    if (result.devRules.content.split('\n').length > 15) lines.push('... (截断)');
+    lines.push('');
+  }
+
+  // User Rules
+  if (result.userRules) {
+    lines.push('## 📝 用户自定义规则');
+    lines.push('');
+    lines.push(result.userRules);
     lines.push('');
   }
 

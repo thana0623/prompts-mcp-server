@@ -1,0 +1,34 @@
+{
+  "description": "Cline hooks configuration for prompts-mcp-server",
+  "instructions": [
+    "Copy the hook scripts to your project's .prompts-mcp/adapters/cline/ directory.",
+    "Then configure Cline hooks in your Cline settings (UI or .clinerules/hooks/):",
+    "",
+    "Hook: TaskStart",
+    "  Command: bash .prompts-mcp/adapters/cline/session-start.sh",
+    "",
+    "Hook: PostToolUse",
+    "  Command: bash .prompts-mcp/adapters/cline/normalize-log.sh",
+    "  Timeout: 5s",
+    "",
+    "Hook: TaskComplete",
+    "  Command: bash .prompts-mcp/adapters/cline/session-end.sh",
+    "  Timeout: 30s",
+    "",
+    "For detailed setup, see: https://docs.cline.bot/customization/hooks"
+  ],
+  "hooks": {
+    "TaskStart": {
+      "command": "bash .prompts-mcp/adapters/cline/session-start.sh",
+      "timeout": 30
+    },
+    "PostToolUse": {
+      "command": "bash .prompts-mcp/adapters/cline/normalize-log.sh",
+      "timeout": 5
+    },
+    "TaskComplete": {
+      "command": "bash .prompts-mcp/adapters/cline/session-end.sh",
+      "timeout": 30
+    }
+  }
+}

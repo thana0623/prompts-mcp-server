@@ -1,43 +1,74 @@
 # prompts-mcp-server
 
-一个通用的 MCP (Model Context Protocol) Server，可自动为任意软件项目生成和管理 prompts 系统，使 AI 编程助手能够在开发会话间保持持久化上下文。
+AI 无关的上下文生命周期基础设施：Hook 驱动日志 + MCP 上下文管理。
 
-## 功能特性
+核心设计：**脚本管状态，AI 管语义**。不依赖 AI 主动调用日志工具。
 
-- **智能项目扫描** — 自动识别目标项目的技术栈、框架、数据库和构建工具
-- **上下文持久化** — 维护项目上下文、对话记录、模块变更历史的完整链路
-- **需求澄清检查** — 基于 5 项标准的需求确认机制，避免盲目开发
-- **计划生成** — 需求确认后生成可执行计划，等待用户确认后再实施
-- **滚动窗口系统** — 维护最近 5 条对话记录和 10 条状态摘要，自动轮转
-- **模块级追踪** — 按功能模块记录变更历史，便于追溯
-- **双接口模式** — 支持 MCP Server（stdio 协议）和 CLI 两种使用方式
-- **非破坏性初始化** — 生成 prompts 文件时不会覆盖已有文件
+## 支持的 AI 助手
 
-## MCP 工具
+| 助手 | MCP | Hooks | 自动日志 |
+|------|-----|-------|---------|
+| Claude Code | Yes | SessionStart / PostToolUse / SessionEnd | 完整 |
+| Cline | Yes | TaskStart / PostToolUse / TaskComplete + 5 others | 完整 |
+| Cursor | Yes | 无（Rules only） | 手动（MCP） |
+| Windsurf | Yes | 无 | 手动（MCP） |
+| Copilot | Yes | 无 | 手动（MCP） |
+| Continue | Yes | 无 | 手动（MCP） |
 
-| 工具 | 说明 |
-|------|------|
-| `init_prompts` | 扫描目标项目并自动生成 prompts 文件体系 |
-| `bootstrap` | 一键加载所有上下文文件，AI 代理启动时第一步调用 |
-| `check_requirements` | 5 项标准需求澄清检查（目标、输入输出、约束、验收标准、影响范围） |
-| `make_plan` | 需求澄清通过后生成可执行计划 |
-| `log_dialog` | 记录对话条目到传输链路（滚动窗口 + 状态摘要） |
-| `log_module` | 记录模块级变更（目录式管理） |
-| `read_module` | 读取模块变更历史 |
-| `update_todos` | 更新 TODO 列表（添加/完成/移除） |
+- **有 Hooks 的助手**（Claude Code / Cline）：自动捕获每次工具调用，写入 JSONL，SessionEnd 自动处理
+- **无 Hooks 的助手**（Cursor 等）：通过 Rules 指导 AI 在适当时机调用 MCP 工具
 
-## 安装
+## 快速开始
+
+### 1. 安装
 
 ```bash
 npm install
 npm run build
 ```
 
-## 使用
+### 2. 初始化
 
-### 作为 MCP Server 集成
+```bash
+# Claude Code
+npx prompts-mcp init --assistant claude-code --project-root /path/to/project
 
-在 AI 助手（如 Cline、Claude Desktop 等）的配置中添加：
+# Cline
+npx prompts-mcp init --assistant cline
+
+# Cursor
+npx prompts-mcp init --assistant cursor
+
+# Windsurf / Copilot / Continue
+npx prompts-mcp init --assistant windsurf
+npx prompts-mcp init --assistant copilot
+npx prompts-mcp init --assistant continue
+```
+
+初始化后生成：
+
+```
+your-project/
+  .prompts-mcp/
+    hooks/                          # 共享核心脚本（助手无关）
+      auto-log.sh                   # 标准化 JSON → JSONL
+      process-logs.sh               # JSONL → recent-5 + summary-10
+      session-end.sh                # 处理日志 + git commit
+    adapters/
+      <assistant>/                  # 选定助手的适配器
+        normalize-log.sh            # 转换助手原生格式 → 标准化 JSON
+        session-start.sh / session-end.sh
+        settings.json               # 助手配置模板
+  .claude/ 或 .cursor/ 等           # 助手配置（由 init 生成）
+  .github/prompts/                  # prompts 文件
+  logs/dialogs/                     # JSONL 日志
+```
+
+### 3. 开始编码
+
+有 Hooks 的助手（Claude Code / Cline）无需额外操作，自动日志即刻生效。
+
+无 Hooks 的助手需要配置 MCP Server：
 
 ```json
 {
@@ -53,38 +84,88 @@ npm run build
 }
 ```
 
-### 作为 CLI 使用
+## 架构
 
-```bash
-# 初始化 prompts 系统
-npm run cli init [--project-root /path]
-
-# 加载所有上下文
-npm run cli bootstrap
-
-# 需求检查
-npm run cli check "任务描述"
-
-# 生成计划
-npm run cli plan "任务描述"
-
-# 记录对话
-npm run cli log --title "xxx" --request "xxx" [--changes ...]
-
-# 模块日志
-npm run cli module-log <module> --change "xxx"
-npm run cli module-read <module>
-npm run cli module-list
-
-# TODO 管理
-npm run cli todos add|complete|remove "todo text"
+```
+┌─────────────────────────────────────────────────┐
+│                  AI 助手                          │
+│  Claude Code / Cline / Cursor / Windsurf / ...   │
+└──────────────┬──────────────────────────────────┘
+               │
+    ┌──────────▼──────────┐
+    │    适配器层           │  adapters/<assistant>/
+    │  normalize-log.sh    │  转换原生格式 → 标准化 JSON
+    └──────────┬──────────┘
+               │ pipe
+    ┌──────────▼──────────┐
+    │    共享核心层         │  hooks/
+    │  auto-log.sh         │  JSONL 写入
+    │  process-logs.sh     │  滚动窗口更新
+    │  session-end.sh      │  处理 + git commit
+    └──────────┬──────────┘
+               │
+    ┌──────────▼──────────┐
+    │    MCP Server        │  src/
+    │  init / bootstrap    │  上下文管理
+    │  check / plan        │  需求澄清
+    │  log / module        │  日志记录
+    └─────────────────────┘
 ```
 
-### 开发模式
+### 标准化 JSON 格式
+
+所有适配器输出统一格式：
+
+```json
+{
+  "tool": "Edit",
+  "target": "src/file.ts",
+  "summary": "Modified src/file.ts",
+  "session": "abc123",
+  "time": "2026-05-08T10:30:00Z",
+  "assistant": "claude-code"
+}
+```
+
+### Hook 工作流（有 Hooks 的助手）
+
+1. **SessionStart** — 加载上下文（context.md / recent-5 / summary-10 / todos）
+2. **PostToolUse** — 适配器标准化 → 共享 auto-log.sh → JSONL
+3. **SessionEnd** — process-logs.sh → recent-5.md + summary-10.md → git commit
+
+### Rules 工作流（无 Hooks 的助手）
+
+1. AI 读取 Rules 文件，了解 MCP 工具使用时机
+2. 会话开始时调用 `auto_start` 加载上下文
+3. 编码前调用 `check_requirements` + `make_plan`
+4. 完成后调用 `log_dialog` 记录日志
+
+## MCP 工具
+
+| 工具 | 说明 |
+|------|------|
+| `init_prompts` | 扫描项目并生成 prompts 文件体系 |
+| `bootstrap` | 加载所有上下文 |
+| `auto_start` | 会话自动启动（加载全部上下文 + 规则） |
+| `check_requirements` | 5 项需求澄清检查 |
+| `make_plan` | 生成可执行计划 |
+| `log_dialog` | 记录对话日志（有 Hooks 时自动完成） |
+| `log_module` | 记录模块级变更 |
+| `read_module` | 读取模块变更历史 |
+| `update_todos` | 更新待办事项 |
+| `add_rule` / `list_rules` / `remove_rule` | 管理项目规范规则 |
+
+## CLI 命令
 
 ```bash
-npm run dev        # 运行 MCP Server
-npm run dev:cli    # 运行 CLI
+prompts-mcp init [--project-root <path>] [--assistant <name>]
+prompts-mcp bootstrap
+prompts-mcp check "任务描述"
+prompts-mcp plan "任务描述"
+prompts-mcp log --title "xxx" --request "xxx" [--changes ...]
+prompts-mcp module-log <module> --change "xxx" [--files ...]
+prompts-mcp module-read <module>
+prompts-mcp todos add|complete|remove "text"
 ```
 
 ## 环境变量
@@ -92,31 +173,37 @@ npm run dev:cli    # 运行 CLI
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `PROJECT_ROOT` | 目标项目根目录 | `process.cwd()` |
+| `PROMPTS_SUBDIR` | prompts 子目录 | `.github/prompts` |
+| `ASSISTANT` | AI 助手类型 | `claude-code` |
+| `AUTO_COMMIT` | log_dialog 后自动提交 | `true` |
 
-## 生成的文件结构
+## 添加新助手
 
-初始化后会在目标项目的 `.github/prompts/` 目录下生成：
+1. 创建 `adapters/<your-assistant>/` 目录
+2. 编写 `normalize-log.sh`：读取助手 stdin，输出标准化 JSON
+3. 编写 `session-start.sh` 和 `session-end.sh`
+4. 创建配置模板（settings.json / rules.md）
+5. 在 `src/cli.ts` 的 `VALID_ASSISTANTS` 中添加名称
+6. 在 init 命令的 switch 中添加配置生成逻辑
 
+## 从 v1（仅 Claude Code）迁移
+
+现有 `.claude/hooks/` 和 `.claude/settings.json` 继续工作，无需更改。
+
+可选迁移到新架构：
+
+```bash
+npx prompts-mcp init --assistant claude-code
 ```
-.github/prompts/
-├── context.md           # 项目上下文：技术栈、规则、TODO、日志索引
-├── workflow-log.md      # 工作流规则和 AI 对话规范
-├── recent-5.md          # 最近 5 条对话记录（滚动窗口）
-├── summary-10.md        # 每 10 条的状态摘要
-├── log-state.json       # JSON 状态追踪
-├── todos.md             # TODO 列表
-├── dev-rules.md         # 自动生成的开发规则
-├── daily/               # 每日完整日志
-│   └── YYYY-MM-DD.md
-└── modules/             # 各模块变更历史
-    └── <module-name>.md
-```
+
+这会生成 `.prompts-mcp/` 目录和新的 `.claude/settings.json`。验证新配置正常后，可删除旧的 `.claude/hooks/`。
 
 ## 技术栈
 
-- **TypeScript** (ES2022, ESM)
-- **@modelcontextprotocol/sdk** — 官方 MCP SDK
-- **Node.js** 运行时
+- TypeScript (ES2022, ESM)
+- @modelcontextprotocol/sdk
+- Node.js 运行时
+- Bash hooks（无外部依赖）
 
 ## 许可证
 
