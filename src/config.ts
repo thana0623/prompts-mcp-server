@@ -43,6 +43,9 @@ export const config = {
   /** prompts 文件存放的子目录（相对于项目根目录） */
   promptsSubDir: process.env.PROMPTS_SUBDIR || '.github/prompts',
 
+  /** AI 助手类型 */
+  assistant: process.env.ASSISTANT || 'claude-code',
+
   /** MCP Server 名称 */
   serverName: process.env.MCP_SERVER_NAME || 'prompts-mcp-server',
 

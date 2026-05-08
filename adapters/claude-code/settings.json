@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/check-init.sh",
-            "statusMessage": "Checking prompts initialization..."
+            "command": "bash .prompts-mcp/adapters/claude-code/session-start.sh",
+            "statusMessage": "Loading project context..."
           }
         ]
       }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/auto-log.sh",
+            "command": "bash .prompts-mcp/adapters/claude-code/normalize-log.sh",
             "timeout": 5
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/session-end.sh",
+            "command": "bash .prompts-mcp/adapters/claude-code/session-end.sh",
             "statusMessage": "Finalizing session...",
             "timeout": 30
           }

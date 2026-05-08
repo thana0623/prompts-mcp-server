@@ -7,6 +7,11 @@
   "bin": {
     "prompts-mcp": "build/cli.js"
   },
+  "files": [
+    "build/",
+    "hooks/",
+    "adapters/"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node build/index.js",

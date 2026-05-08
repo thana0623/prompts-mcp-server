@@ -38,16 +38,24 @@ import {
 } from './requirements-check.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PACKAGE_ROOT = path.resolve(__dirname, '..');
+
+const VALID_ASSISTANTS = ['claude-code', 'cline', 'cursor', 'windsurf', 'copilot', 'continue'];
 
 function printHelp(): void {
   console.log(`
-🚀 Prompts MCP Server - CLI
+Prompts MCP Server - CLI
 
 Usage:
-  npx tsx src/cli.ts <command> [options]
+  prompts-mcp <command> [options]
 
 Commands:
-  init [--project-root <path>]   初始化 prompts 体系（扫描项目自动生成）
+  init [--project-root <path>] [--assistant <name>]
+       初始化 prompts 体系 + hooks + 适配器
   bootstrap                       一键启动，加载所有上下文
   check <description>             需求澄清检查（5 项标准）
   plan <description>              生成可行计划（需求需已澄清）
@@ -58,15 +66,16 @@ Commands:
   todos add|complete|remove <t>   更新待办事项
   help                            显示帮助
 
+Supported assistants:
+  claude-code, cline, cursor, windsurf, copilot, continue
+
 Examples:
-  npx tsx src/cli.ts init --project-root /path/to/my-project
-  npx tsx src/cli.ts bootstrap
-  npx tsx src/cli.ts check "添加用户登录功能"
-  npx tsx src/cli.ts plan "添加用户登录功能，支持 JWT"
-  npx tsx src/cli.ts log --title "添加登录" --request "实现 JWT 登录" --changes "AuthController.java"
-  npx tsx src/cli.ts module-log auth --change "添加 JWT 登录" --files "AuthController.java"
-  npx tsx src/cli.ts module-read auth
-  npx tsx src/cli.ts todos add "补充测试用例"
+  prompts-mcp init --project-root /path/to/project --assistant claude-code
+  prompts-mcp init --assistant cline
+  prompts-mcp init --assistant cursor
+  prompts-mcp bootstrap
+  prompts-mcp check "添加用户登录功能"
+  prompts-mcp plan "添加用户登录功能，支持 JWT"
 `);
 }
 
@@ -90,27 +99,121 @@ async function main(): Promise<void> {
     case 'init': {
       const rootIndex = args.indexOf('--project-root');
       const projectRoot = rootIndex !== -1 ? args[rootIndex + 1] : getProjectRoot();
-      printSeparator('初始化 Prompts 体系');
+
+      const assistIndex = args.indexOf('--assistant');
+      const assistant = assistIndex !== -1 ? args[assistIndex + 1] : 'claude-code';
+
+      if (!VALID_ASSISTANTS.includes(assistant)) {
+        console.error(`Unknown assistant: ${assistant}`);
+        console.error(`Valid options: ${VALID_ASSISTANTS.join(', ')}`);
+        process.exit(1);
+      }
+
+      printSeparator(`初始化 Prompts 体系 (${assistant})`);
+
+      // Step 1: Generate prompts files (existing logic)
       const result = initPrompts(projectRoot);
 
-      console.log(`项目: ${result.projectInfo.name}`);
-      console.log(`路径: ${result.promptsDir}\n`);
-      console.log('已创建文件:');
+      console.log(`Project: ${result.projectInfo.name}`);
+      console.log(`Path: ${result.promptsDir}\n`);
+      console.log('Files created:');
       for (const f of result.filesCreated) {
-        console.log(`  ✅ ${f}`);
+        console.log(`  + ${f}`);
       }
-      console.log('\n检测到的项目信息:');
-      console.log(`  语言: ${result.projectInfo.languages.join(', ') || '未检测到'}`);
-      console.log(`  框架: ${result.projectInfo.frameworks.join(', ') || '未检测到'}`);
-      console.log(`  前端: ${result.projectInfo.hasFrontend ? result.projectInfo.frontendFramework : '无'}`);
-      console.log(`  后端: ${result.projectInfo.hasBackend ? result.projectInfo.backendFramework : '无'}`);
+      console.log('\nDetected project info:');
+      console.log(`  Languages: ${result.projectInfo.languages.join(', ') || 'none'}`);
+      console.log(`  Frameworks: ${result.projectInfo.frameworks.join(', ') || 'none'}`);
 
       if (result.errors.length > 0) {
-        console.log('\n错误:');
+        console.log('\nErrors:');
         for (const e of result.errors) {
-          console.log(`  ❌ ${e}`);
+          console.log(`  ! ${e}`);
         }
       }
+
+      // Step 2: Scaffold hooks and adapter
+      console.log('\n--- Setting up hooks and adapter ---\n');
+
+      const hooksSrc = path.join(PACKAGE_ROOT, 'hooks');
+      const adapterSrc = path.join(PACKAGE_ROOT, 'adapters', assistant);
+      const hooksDest = path.join(projectRoot, '.prompts-mcp', 'hooks');
+      const adapterDest = path.join(projectRoot, '.prompts-mcp', 'adapters', assistant);
+
+      // Copy shared hooks
+      if (fs.existsSync(hooksSrc)) {
+        fs.cpSync(hooksSrc, hooksDest, { recursive: true });
+        console.log('  + .prompts-mcp/hooks/ (shared core)');
+      }
+
+      // Copy adapter
+      if (fs.existsSync(adapterSrc)) {
+        fs.cpSync(adapterSrc, adapterDest, { recursive: true });
+        console.log(`  + .prompts-mcp/adapters/${assistant}/`);
+      }
+
+      // Step 3: Generate assistant-specific config
+      if (assistant === 'claude-code') {
+        const settingsTemplate = path.join(adapterSrc, 'settings.json');
+        const settingsDest = path.join(projectRoot, '.claude', 'settings.json');
+        if (fs.existsSync(settingsTemplate)) {
+          fs.mkdirSync(path.dirname(settingsDest), { recursive: true });
+          fs.copyFileSync(settingsTemplate, settingsDest);
+          console.log('  + .claude/settings.json');
+        }
+      } else if (assistant === 'cline') {
+        const hooksTemplate = path.join(adapterSrc, 'hooks.json');
+        const hooksDest2 = path.join(projectRoot, '.clinerules', 'hooks', 'prompts-mcp.json');
+        if (fs.existsSync(hooksTemplate)) {
+          fs.mkdirSync(path.dirname(hooksDest2), { recursive: true });
+          fs.copyFileSync(hooksTemplate, hooksDest2);
+          console.log('  + .clinerules/hooks/prompts-mcp.json');
+        }
+      } else if (assistant === 'cursor') {
+        const rulesSrc = path.join(adapterSrc, 'rules.md');
+        const rulesDest = path.join(projectRoot, '.cursor', 'rules', 'prompts-mcp.mdc');
+        if (fs.existsSync(rulesSrc)) {
+          fs.mkdirSync(path.dirname(rulesDest), { recursive: true });
+          fs.copyFileSync(rulesSrc, rulesDest);
+          console.log('  + .cursor/rules/prompts-mcp.mdc');
+        }
+      } else if (assistant === 'windsurf') {
+        const rulesSrc = path.join(adapterSrc, 'rules.md');
+        const rulesDest = path.join(projectRoot, '.windsurfrules');
+        if (fs.existsSync(rulesSrc)) {
+          fs.copyFileSync(rulesSrc, rulesDest);
+          console.log('  + .windsurfrules');
+        }
+      } else if (assistant === 'copilot') {
+        const rulesSrc = path.join(adapterSrc, 'rules.md');
+        const rulesDest = path.join(projectRoot, '.github', 'copilot-instructions.md');
+        if (fs.existsSync(rulesSrc)) {
+          fs.mkdirSync(path.dirname(rulesDest), { recursive: true });
+          fs.copyFileSync(rulesSrc, rulesDest);
+          console.log('  + .github/copilot-instructions.md');
+        }
+      } else if (assistant === 'continue') {
+        const rulesSrc = path.join(adapterSrc, 'rules.md');
+        const rulesDest = path.join(projectRoot, '.continue', 'rules', 'prompts-mcp.md');
+        if (fs.existsSync(rulesSrc)) {
+          fs.mkdirSync(path.dirname(rulesDest), { recursive: true });
+          fs.copyFileSync(rulesSrc, rulesDest);
+          console.log('  + .continue/rules/prompts-mcp.md');
+        }
+      }
+
+      // Print next steps
+      console.log('\n--- Next steps ---\n');
+      if (assistant === 'claude-code') {
+        console.log('Claude Code hooks are configured in .claude/settings.json.');
+        console.log('Auto-logging will start on next session.');
+      } else if (assistant === 'cline') {
+        console.log('Configure Cline hooks using the template in .clinerules/hooks/prompts-mcp.json.');
+        console.log('See: https://docs.cline.bot/customization/hooks');
+      } else {
+        console.log(`Rules file created. The AI will be instructed to use MCP tools at lifecycle points.`);
+        console.log('Make sure the prompts-mcp MCP server is configured in your assistant settings.');
+      }
+      console.log('');
       break;
     }
 

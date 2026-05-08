@@ -1,38 +1,35 @@
 # Project: prompts-mcp-server
 
-## Session Lifecycle
+## Architecture
 
-This project uses an automated context lifecycle via Claude Code hooks and the prompts-mcp MCP server.
+This project is an AI-agnostic context lifecycle infrastructure. The MCP server and CLI are fully generic — they contain zero references to any specific AI assistant.
+
+The hook system uses an adapter pattern:
+- `hooks/` — shared core scripts (assistant-agnostic)
+- `adapters/<assistant>/` — thin wrappers that normalize each assistant's format
+
+This project is developed with Claude Code, so `.claude/settings.json` is configured to use the `adapters/claude-code/` adapter.
+
+## Session Lifecycle
 
 ### Phase 1: Session Start (automated by hook)
 
-The `SessionStart` hook (`.claude/hooks/check-init.sh`) automatically:
+The `adapters/claude-code/session-start.sh` hook automatically:
 - Checks if `.github/prompts/context.md` exists
-- If initialized: loads all context (context.md, recent-5, summary-10, todos, dev-rules, user rules, modules)
-- If not initialized: warns you to run `init_prompts` first
+- Loads all context via `bootstrap` CLI command
 
-No manual action needed — context is injected at conversation start.
+### Phase 2: During Conversation
 
-### Phase 2: During Conversation (Claude responsibility)
-
-- Read context files to understand the project — do NOT scan the project filesystem directly
+- Read context files to understand the project
 - Before coding: use `check_requirements` MCP tool, then `make_plan`
 - Consult module history via `read_module` before modifying modules
 
-### Phase 3: Per-Turn Logging (Claude responsibility)
+### Phase 3: Auto-Logging (automated by hook)
 
-After completing meaningful work (code changes, decisions, discussions), call the `log_dialog` MCP tool from `prompts-mcp` to record the turn:
-- `title`: concise summary of what was done
-- `request`: the user's original request (cleaned up)
-- `changes`: list of files changed
-- `decisions`: any technical decisions made
-- `todos`: any remaining TODO items
-
-This keeps the rolling windows (recent-5, summary-10) always up to date.
+The `adapters/claude-code/normalize-log.sh` hook normalizes Claude Code's tool call data into a standard JSON format, then pipes it to `hooks/auto-log.sh` which appends to `logs/dialogs/YYYY-MM-DD.jsonl`.
 
 ### Phase 4: Session End (automated by hook)
 
-The `SessionEnd` hook (`.claude/hooks/session-end.sh`) automatically:
-- Commits any uncommitted `.github/prompts/` changes to git
-
-No manual action needed.
+The `adapters/claude-code/session-end.sh` hook delegates to `hooks/session-end.sh` which:
+1. Runs `process-logs.sh` to update recent-5.md and summary-10.md
+2. Git commits all changes
