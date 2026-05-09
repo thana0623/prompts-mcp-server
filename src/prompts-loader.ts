@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getProjectRoot, getPromptsDir } from './config.js';
 import { loadAllRules } from './rules-manager.js';
+import { listSkills, formatSkillList } from './skills-manager.js';
 
 export { getProjectRoot, getPromptsDir };
 
@@ -65,6 +66,7 @@ export interface BootstrapResult {
   userRules: string;
   logState: LogState | null;
   modules: string[];
+  skills: string;
 }
 
 // ─── Prompt Loaders ──────────────────────────────────────────────────
@@ -139,8 +141,9 @@ export function bootstrap(): BootstrapResult {
   const userRules = loadAllRules();
   const logState = loadLogState();
   const modules = listModules();
+  const skills = formatSkillList();
 
-  return { context, daily, recent5, summary10, todos, devRules, userRules, logState, modules };
+  return { context, daily, recent5, summary10, todos, devRules, userRules, logState, modules, skills };
 }
 
 /**
@@ -151,6 +154,24 @@ export function formatBootstrap(result: BootstrapResult): string {
 
   lines.push('# 🚀 Prompts MCP Server - Bootstrap');
   lines.push('');
+
+  // Skill 选择提示 — 放在最顶部，确保智能体第一时间看到
+  if (result.skills) {
+    lines.push('## ⚡ 首先：选择你的角色');
+    lines.push('');
+    lines.push('在开始任何工作之前，**必须**先询问用户想以哪个角色（Skill）开发。');
+    lines.push('');
+    const skills = result.skills.split('\n').filter(l => l.startsWith('|') && !l.startsWith('|---') && !l.startsWith('| #'));
+    for (const s of skills) {
+      lines.push(s);
+    }
+    lines.push('');
+    lines.push('> 调用 `select_skill` 加载对应 Skill 后再开始工作。');
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+
   lines.push('## ✅ 加载清单');
   lines.push('');
   lines.push(`✓ context.md: ${result.context.content ? '已加载' : '未找到'}`);
@@ -161,6 +182,7 @@ export function formatBootstrap(result: BootstrapResult): string {
   lines.push(`✓ dev-rules.md: ${result.devRules.content ? '已加载' : '未找到'}`);
   lines.push(`✓ 用户规则: ${result.userRules ? '已加载' : '无'}`);
   lines.push(`✓ 模块记录: ${result.modules.length > 0 ? result.modules.join(', ') : '无'}`);
+  lines.push(`✓ Skills: ${result.skills ? '已加载' : '无'}`);
   lines.push('');
 
   // Context 摘要
