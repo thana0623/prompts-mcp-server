@@ -3,37 +3,37 @@
 > Auto-generated from PostToolUse hooks. Do not edit manually.
 > Showing last 5 state-changing events.
 
-## Event-087
+## Event-163
 
-- **Time**: 2026-05-08 05:48:01
+- **Time**: 2026-05-09 04:57:05
+- **Tool**: `Edit`
+- **Target**: `C:\admin\Code\Project\prompts-mcp-server\package.json`
+- **Summary**: Modified C:\admin\Code\Project\prompts-mcp-server\package.json
+
+## Event-164
+
+- **Time**: 2026-05-09 04:57:53
 - **Tool**: `Bash`
-- **Target**: `ls "C:/admin/Code/Project/prompts-mcp-server/node_modules/" 2>/dev/null | head -30`
-- **Summary**: Ran: ls "C:/admin/Code/Project/prompts-mcp-server/node_modules/" 2>/dev/null | head -30
+- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && npm run build 2>&1 && npm link 2>&1`
+- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && npm run build 2>&1 && npm link 2>&1
 
-## Event-088
+## Event-165
 
-- **Time**: 2026-05-08 05:48:02
+- **Time**: 2026-05-09 04:58:23
 - **Tool**: `Bash`
-- **Target**: `find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "*.node" -type f 2>/dev/null | head -20`
-- **Summary**: Ran: find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "*.node" -type f 2>/dev/null | he
+- **Target**: `mkdir -p /tmp/test-pmcp && cd /tmp/test-pmcp && echo '{"name":"demo"}' > package.json && pmcp setup 2>&1 | head -20`
+- **Summary**: Ran: mkdir -p /tmp/test-pmcp && cd /tmp/test-pmcp && echo '{"name":"demo"}' > package.json && pmcp setup 
 
-## Event-089
+## Event-166
 
-- **Time**: 2026-05-08 05:48:02
+- **Time**: 2026-05-09 04:59:09
 - **Tool**: `Bash`
-- **Target**: `find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "binding.gyp" -type f 2>/dev/null | head -20`
-- **Summary**: Ran: find "C:/admin/Code/Project/prompts-mcp-server/node_modules" -name "binding.gyp" -type f 2>/dev/null
+- **Target**: `rm -rf /tmp/test-pmcp && mkdir -p /tmp/test-pmcp && echo '{"name":"demo"}' > /tmp/test-pmcp/package.json && pmcp setup /tmp/test-pmcp 2>&1 | tail -10`
+- **Summary**: Ran: rm -rf /tmp/test-pmcp && mkdir -p /tmp/test-pmcp && echo '{"name":"demo"}' > /tmp/test-pmcp/package.
 
-## Event-090
+## Event-167
 
-- **Time**: 2026-05-08 05:54:11
+- **Time**: 2026-05-09 04:59:15
 - **Tool**: `Bash`
-- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && npm pack --dry-run 2>&1`
-- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && npm pack --dry-run 2>&1
-
-## Event-091
-
-- **Time**: 2026-05-08 05:54:35
-- **Tool**: `Bash`
-- **Target**: `head -1 "C:/admin/Code/Project/prompts-mcp-server/build/cli.js"`
-- **Summary**: Ran: head -1 "C:/admin/Code/Project/prompts-mcp-server/build/cli.js"
+- **Target**: `rm -rf /tmp/test-pmcp`
+- **Summary**: Ran: rm -rf /tmp/test-pmcp
