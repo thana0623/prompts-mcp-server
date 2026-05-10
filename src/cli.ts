@@ -67,11 +67,11 @@ Usage:
   prompts-mcp <command> [options]
 
 Commands:
+  start [--project-root <path>] [--assistant <name>]
+       一键启动：自动初始化 + 加载上下文 + 选择 Skill（推荐）
   setup [--project-root <path>] [--assistant <name>]
-       一键初始化：生成 prompts + hooks + MCP 配置 + Skills（推荐）
-  init [--project-root <path>] [--assistant <name>]
-       初始化 prompts 体系 + hooks + 适配器（不含 MCP 配置）
-  bootstrap                       一键启动，加载所有上下文
+       一键初始化：生成 prompts + hooks + MCP 配置 + Skills
+  bootstrap                       加载上下文（已初始化项目使用）
   check <description>             需求澄清检查（5 项标准）
   plan <description>              生成可行计划（需求需已澄清）
   log --title <t> --request <r>   记录对话日志
@@ -93,15 +93,11 @@ Supported assistants:
   claude-code, cline, cursor, windsurf, copilot, continue
 
 Examples:
-  prompts-mcp setup --project-root /path/to/project
-  prompts-mcp setup --project-root /path/to/project --assistant cline
-  prompts-mcp init --project-root /path/to/project --assistant claude-code
-  prompts-mcp bootstrap
-  prompts-mcp check "添加用户登录功能"
-  prompts-mcp plan "添加用户登录功能，支持 JWT"
-  prompts-mcp skill init
-  prompts-mcp skill list
-  prompts-mcp skill create my-skill
+  prompts-mcp start                                    # 一键启动（推荐）
+  prompts-mcp start --project-root /path/to/project    # 指定项目启动
+  prompts-mcp setup --project-root /path/to/project    # 仅初始化
+  prompts-mcp bootstrap                                # 加载上下文
+  prompts-mcp skill list                               # 查看 skill
 `);
 }
 
@@ -122,6 +118,180 @@ async function main(): Promise<void> {
   }
 
   switch (command) {
+    case 'start': {
+      const rootIndex = args.indexOf('--project-root');
+      const projectRoot = rootIndex !== -1
+        ? path.resolve(args[rootIndex + 1])
+        : (args[1] && !args[1].startsWith('--') ? path.resolve(args[1]) : getProjectRoot());
+
+      const assistIndex = args.indexOf('--assistant');
+      const assistant = assistIndex !== -1 ? args[assistIndex + 1] : 'claude-code';
+
+      if (!VALID_ASSISTANTS.includes(assistant)) {
+        console.error(`Unknown assistant: ${assistant}`);
+        console.error(`Valid options: ${VALID_ASSISTANTS.join(', ')}`);
+        process.exit(1);
+      }
+
+      printSeparator('Prompts MCP - 一键启动');
+
+      // 切换 config 到目标项目
+      setProjectRoot(projectRoot);
+
+      // ── Step 1: 检查是否已初始化 ──
+      const contextFile = path.join(projectRoot, '.github', 'prompts', 'context.md');
+      const isInitialized = fs.existsSync(contextFile);
+
+      if (!isInitialized) {
+        console.log('[1/4] 项目未初始化，执行初始化...\n');
+
+        // 运行 setup
+        const result = initPrompts(projectRoot);
+        console.log(`  Project: ${result.projectInfo.name}`);
+        console.log(`  Path: ${result.promptsDir}`);
+        for (const f of result.filesCreated) {
+          console.log(`    + ${f}`);
+        }
+
+        // 初始化全局 skill 仓库
+        if (!isGlobalSkillsInitialized()) {
+          const globalResult = initGlobalSkills({
+            sourceDir: path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills'),
+          });
+          if (globalResult.success) {
+            console.log('    + 全局 skill 仓库已初始化');
+          }
+        }
+
+        // 复制 hooks 和 adapter
+        const hooksSrc = path.join(PACKAGE_ROOT, 'hooks');
+        const adapterSrc = path.join(PACKAGE_ROOT, 'adapters', assistant);
+        const hooksDest = path.join(projectRoot, '.prompts-mcp', 'hooks');
+        const adapterDest = path.join(projectRoot, '.prompts-mcp', 'adapters', assistant);
+
+        if (fs.existsSync(hooksSrc)) {
+          fs.cpSync(hooksSrc, hooksDest, { recursive: true });
+        }
+        if (fs.existsSync(adapterSrc)) {
+          fs.cpSync(adapterSrc, adapterDest, { recursive: true });
+        }
+
+        // 写入 MCP server 路径
+        const mcpCliPath = path.join(PACKAGE_ROOT, 'build', 'cli.js');
+        const mcpConfigDir = path.join(projectRoot, '.prompts-mcp');
+        fs.mkdirSync(mcpConfigDir, { recursive: true });
+        fs.writeFileSync(path.join(mcpConfigDir, 'mcp-server-path'), mcpCliPath, 'utf-8');
+
+        // 写入 .pmcp-root 标记
+        const pmcpRootMarker = path.join(projectRoot, '.pmcp-root');
+        if (!fs.existsSync(pmcpRootMarker)) {
+          fs.writeFileSync(pmcpRootMarker, projectRoot, 'utf-8');
+        }
+
+        // 复制默认 skill 到项目
+        const skillsSrc = path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills');
+        const skillsDest = path.join(projectRoot, '.github', 'prompts', 'skills');
+        if (fs.existsSync(skillsSrc)) {
+          if (!fs.existsSync(skillsDest)) {
+            fs.mkdirSync(skillsDest, { recursive: true });
+          }
+          const skillFiles = fs.readdirSync(skillsSrc).filter(f => f.endsWith('.md'));
+          for (const f of skillFiles) {
+            const destFile = path.join(skillsDest, f);
+            if (!fs.existsSync(destFile)) {
+              fs.copyFileSync(path.join(skillsSrc, f), destFile);
+            }
+          }
+        }
+
+        // 生成 .claude/settings.json
+        if (assistant === 'claude-code') {
+          const settingsDir = path.join(projectRoot, '.claude');
+          const settingsPath = path.join(settingsDir, 'settings.json');
+          fs.mkdirSync(settingsDir, { recursive: true });
+
+          let existingSettings: any = {};
+          if (fs.existsSync(settingsPath)) {
+            try { existingSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')); } catch { /* ignore */ }
+          }
+
+          const hookBase = '.prompts-mcp/adapters/claude-code';
+          const newSettings = {
+            ...existingSettings,
+            hooks: {
+              ...(existingSettings.hooks || {}),
+              SessionStart: [{
+                matcher: '*',
+                hooks: [{
+                  type: 'command',
+                  command: `bash ${hookBase}/session-start.sh`,
+                  statusMessage: 'Loading project context...'
+                }]
+              }],
+              PostToolUse: [{
+                matcher: '*',
+                hooks: [{
+                  type: 'command',
+                  command: `bash ${hookBase}/normalize-log.sh`,
+                  timeout: 5
+                }]
+              }],
+              SessionEnd: [{
+                matcher: '*',
+                hooks: [{
+                  type: 'command',
+                  command: `bash ${hookBase}/session-end.sh`,
+                  statusMessage: 'Finalizing session...',
+                  timeout: 30
+                }]
+              }]
+            }
+          };
+
+          fs.writeFileSync(settingsPath, JSON.stringify(newSettings, null, 2), 'utf-8');
+        }
+
+        console.log('\n✅ 初始化完成\n');
+      } else {
+        console.log('[1/4] 项目已初始化，跳过\n');
+      }
+
+      // ── Step 2: 确保全局 skill 仓库存在 ──
+      console.log('[2/4] 检查全局 Skill 仓库...\n');
+
+      if (!isGlobalSkillsInitialized()) {
+        const globalResult = initGlobalSkills({
+          sourceDir: path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills'),
+        });
+        if (globalResult.success) {
+          console.log('    + 全局 skill 仓库已初始化');
+        }
+      } else {
+        console.log('    = 全局 skill 仓库已存在');
+      }
+
+      // ── Step 3: 加载上下文 ──
+      console.log('\n[3/4] 加载上下文...\n');
+      const bootstrapResult = bootstrap();
+      console.log(formatBootstrap(bootstrapResult));
+
+      // ── Step 4: Skill 选择提示 ──
+      console.log('\n[4/4] Skill 选择\n');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('  请选择操作：');
+      console.log('═══════════════════════════════════════════════════════════');
+      console.log('');
+      console.log('  1. 选择已有 Skill 开始开发');
+      console.log('  2. 创建新的项目 Skill');
+      console.log('  3. 创建新的个人 Skill');
+      console.log('  4. 跳过，直接开始');
+      console.log('');
+      console.log('  在 Claude Code 中输入对应数字或直接开始对话');
+      console.log('');
+
+      break;
+    }
+
     case 'setup': {
       const rootIndex = args.indexOf('--project-root');
       // 支持三种写法:
