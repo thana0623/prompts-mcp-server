@@ -5,12 +5,14 @@
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "prompts-mcp": "build/cli.js"
+    "prompts-mcp": "build/cli.js",
+    "pmcp": "build/cli.js"
   },
   "files": [
     "build/",
     "hooks/",
-    "adapters/"
+    "adapters/",
+    ".github/prompts/skills/"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

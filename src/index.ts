@@ -4,7 +4,7 @@
  * prompts-mcp-server - 通用 MCP Server
  *
  * 提供以下工具：
- *   - auto_start         - 会话自动启动，加载全部上下文 + 规则
+ *   - auto_start         - 会话自动启动，加载全部上下文 + 规则 + Skills
  *   - init_prompts       - 扫描项目，自动生成原始 prompts 体系
  *   - bootstrap          - 一键启动，自动读取传递链 + 模块记录
  *   - check_requirements - 需求澄清检查（5 项标准）
@@ -17,6 +17,10 @@
  *   - list_rules         - 列出所有自定义规则
  *   - remove_rule        - 删除一条规则
  *   - commit_dialog      - 手动触发 git commit
+ *   - list_skills        - 列出所有可用角色技能
+ *   - select_skill       - 选择一个 Skill 作为当前身份
+ *   - update_skill       - 自我优化：追加学习记录、更新规范
+ *   - add_skill          - 创建新的角色技能
  *
  * 通过环境变量 PROJECT_ROOT 指定目标项目路径。
  */
@@ -62,6 +66,13 @@ import {
   listRules,
   readRule,
 } from './rules-manager.js';
+import {
+  listSkills,
+  selectSkill,
+  updateSkill,
+  addSkill,
+  formatSkillList,
+} from './skills-manager.js';
 import {
   gitAutoCommit,
   gitStatus,
@@ -314,6 +325,84 @@ class PromptsMcpServer {
             required: ['message'],
           },
         },
+        {
+          name: 'list_skills',
+          description: '【技能列表】列出所有可用的角色技能（Skill）。会话启动时自动展示，也可手动调用。',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'select_skill',
+          description: '【选择技能】选择一个 Skill 作为当前身份角色。返回该 Skill 的完整 prompt（身份 + 开发规范 + 学习记录）。会话开始时应询问用户选择哪个 Skill。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Skill 名称（如 architect、backend、frontend、review）',
+              },
+            },
+            required: ['name'],
+          },
+        },
+        {
+          name: 'update_skill',
+          description: '【技能自优化】会话结束时调用，总结本次开发经验并更新 Skill。可追加学习记录、修改开发规范、更新描述。智能体应主动在每次开发后调用此工具自我进化。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: '要更新的 Skill 名称',
+              },
+              learnings: {
+                type: 'string',
+                description: '本次会话学到的经验教训（会追加到学习记录）',
+              },
+              guidelineChanges: {
+                type: 'string',
+                description: '开发规范的修改（会替换现有规范内容）',
+              },
+              description: {
+                type: 'string',
+                description: '更新 Skill 描述',
+              },
+            },
+            required: ['name'],
+          },
+        },
+        {
+          name: 'add_skill',
+          description: '【创建技能】创建一个新的角色技能。可自定义身份、开发规范等。',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Skill 名称（如 devops、data-engineer）',
+              },
+              icon: {
+                type: 'string',
+                description: '图标 emoji（默认 🎯）',
+              },
+              description: {
+                type: 'string',
+                description: 'Skill 一句话描述',
+              },
+              identity: {
+                type: 'string',
+                description: '身份描述：这个角色是谁，职责是什么',
+              },
+              guidelines: {
+                type: 'string',
+                description: '开发规范：这个角色应遵循的规则和最佳实践',
+              },
+            },
+            required: ['name', 'description', 'identity', 'guidelines'],
+          },
+        },
       ],
     }));
 
@@ -347,6 +436,14 @@ class PromptsMcpServer {
           return this.handleRemoveRule(args);
         case 'commit_dialog':
           return this.handleCommitDialog(args);
+        case 'list_skills':
+          return this.handleListSkills();
+        case 'select_skill':
+          return this.handleSelectSkill(args);
+        case 'update_skill':
+          return this.handleUpdateSkill(args);
+        case 'add_skill':
+          return this.handleAddSkill(args);
         default:
           throw new McpError(
             ErrorCode.MethodNotFound,
@@ -808,6 +905,132 @@ class PromptsMcpServer {
     } else {
       return {
         content: [{ type: 'text', text: `❌ Git 提交失败: ${result.error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  // ─── Skill 工具实现 ───────────────────────────────────────────────
+
+  /**
+   * list_skills: 列出所有可用 skill
+   */
+  private async handleListSkills() {
+    const skillList = formatSkillList();
+
+    if (!skillList) {
+      return {
+        content: [{ type: 'text', text: '🎭 暂无可用 Skill。\n\n使用 `add_skill` 工具或在 `.github/prompts/skills/` 目录下创建 .md 文件来添加 Skill。' }],
+      };
+    }
+
+    return {
+      content: [{ type: 'text', text: skillList }],
+    };
+  }
+
+  /**
+   * select_skill: 选择一个 skill 作为当前身份
+   */
+  private async handleSelectSkill(args: any) {
+    const name = typeof args?.name === 'string' ? args.name : '';
+
+    if (!name) {
+      return {
+        content: [{ type: 'text', text: '❌ "name" 是必填参数。请指定要选择的 Skill 名称。' }],
+        isError: true,
+      };
+    }
+
+    const skill = selectSkill(name);
+    if (!skill) {
+      return {
+        content: [{ type: 'text', text: `❌ Skill 不存在: ${name}\n\n可用 Skill: ${listSkills().map(s => s.meta.name).join(', ') || '无'}` }],
+        isError: true,
+      };
+    }
+
+    const lines: string[] = [];
+    lines.push(`# ${skill.meta.icon} Skill 已激活: ${skill.meta.name}`);
+    lines.push('');
+    lines.push(`> ${skill.meta.description} (v${skill.meta.version})`);
+    lines.push('');
+    lines.push(skill.content);
+    lines.push('');
+    lines.push('---');
+    lines.push(`> Skill \`${name}\` 已加载。请以该角色身份开始工作。`);
+
+    return {
+      content: [{ type: 'text', text: lines.join('\n') }],
+    };
+  }
+
+  /**
+   * add_skill: 创建新 skill
+   */
+  private async handleAddSkill(args: any) {
+    const name = typeof args?.name === 'string' ? args.name : '';
+    const icon = typeof args?.icon === 'string' ? args.icon : '🎯';
+    const description = typeof args?.description === 'string' ? args.description : '';
+    const identity = typeof args?.identity === 'string' ? args.identity : '';
+    const guidelines = typeof args?.guidelines === 'string' ? args.guidelines : '';
+
+    if (!name || !description || !identity || !guidelines) {
+      return {
+        content: [{ type: 'text', text: '❌ 缺少必填参数。需要：name, description, identity, guidelines。' }],
+        isError: true,
+      };
+    }
+
+    const result = addSkill(name, { icon, description, identity, guidelines });
+    if (result.success) {
+      return {
+        content: [{ type: 'text', text: `✅ Skill \`${name}\` 已创建。\n\n${icon} ${description}\n\n使用 \`select_skill "${name}"\` 来激活。` }],
+      };
+    } else {
+      return {
+        content: [{ type: 'text', text: `❌ 创建 Skill 失败: ${result.error}` }],
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * update_skill: 自我优化 skill
+   */
+  private async handleUpdateSkill(args: any) {
+    const name = typeof args?.name === 'string' ? args.name : '';
+    const learnings = typeof args?.learnings === 'string' ? args.learnings : undefined;
+    const guidelineChanges = typeof args?.guidelineChanges === 'string' ? args.guidelineChanges : undefined;
+    const description = typeof args?.description === 'string' ? args.description : undefined;
+
+    if (!name) {
+      return {
+        content: [{ type: 'text', text: '❌ "name" 是必填参数。' }],
+        isError: true,
+      };
+    }
+
+    if (!learnings && !guidelineChanges && !description) {
+      return {
+        content: [{ type: 'text', text: '❌ 请至少提供一个更新项：learnings / guidelineChanges / description。' }],
+        isError: true,
+      };
+    }
+
+    const result = updateSkill(name, { learnings, guidelineChanges, description });
+    if (result.success) {
+      const parts: string[] = [];
+      if (learnings) parts.push('学习记录已追加');
+      if (guidelineChanges) parts.push('开发规范已更新');
+      if (description) parts.push('描述已更新');
+
+      return {
+        content: [{ type: 'text', text: `✅ Skill \`${name}\` 已更新。\n\n${parts.join('；')}` }],
+      };
+    } else {
+      return {
+        content: [{ type: 'text', text: `❌ 更新 Skill 失败: ${result.error}` }],
         isError: true,
       };
     }

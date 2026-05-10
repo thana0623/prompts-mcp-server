@@ -54,8 +54,10 @@ Usage:
   prompts-mcp <command> [options]
 
 Commands:
+  setup [--project-root <path>] [--assistant <name>]
+       一键初始化：生成 prompts + hooks + MCP 配置 + Skills（推荐）
   init [--project-root <path>] [--assistant <name>]
-       初始化 prompts 体系 + hooks + 适配器
+       初始化 prompts 体系 + hooks + 适配器（不含 MCP 配置）
   bootstrap                       一键启动，加载所有上下文
   check <description>             需求澄清检查（5 项标准）
   plan <description>              生成可行计划（需求需已澄清）
@@ -70,9 +72,9 @@ Supported assistants:
   claude-code, cline, cursor, windsurf, copilot, continue
 
 Examples:
+  prompts-mcp setup --project-root /path/to/project
+  prompts-mcp setup --project-root /path/to/project --assistant cline
   prompts-mcp init --project-root /path/to/project --assistant claude-code
-  prompts-mcp init --assistant cline
-  prompts-mcp init --assistant cursor
   prompts-mcp bootstrap
   prompts-mcp check "添加用户登录功能"
   prompts-mcp plan "添加用户登录功能，支持 JWT"
@@ -96,6 +98,155 @@ async function main(): Promise<void> {
   }
 
   switch (command) {
+    case 'setup': {
+      const rootIndex = args.indexOf('--project-root');
+      // 支持三种写法:
+      //   pmcp setup                    -> 当前目录
+      //   pmcp setup /path/to/project   -> 位置参数
+      //   pmcp setup --project-root /path -> 命名参数
+      const projectRoot = rootIndex !== -1
+        ? path.resolve(args[rootIndex + 1])
+        : (args[1] && !args[1].startsWith('--') ? path.resolve(args[1]) : getProjectRoot());
+
+      const assistIndex = args.indexOf('--assistant');
+      const assistant = assistIndex !== -1 ? args[assistIndex + 1] : 'claude-code';
+
+      if (!VALID_ASSISTANTS.includes(assistant)) {
+        console.error(`Unknown assistant: ${assistant}`);
+        console.error(`Valid options: ${VALID_ASSISTANTS.join(', ')}`);
+        process.exit(1);
+      }
+
+      printSeparator(`一键 Setup (${assistant})`);
+
+      // ── Step 1: 生成 prompts 文件 ──
+      console.log('[1/5] 生成 prompts 文件...\n');
+      const result = initPrompts(projectRoot);
+      console.log(`  Project: ${result.projectInfo.name}`);
+      console.log(`  Path: ${result.promptsDir}`);
+      for (const f of result.filesCreated) {
+        console.log(`    + ${f}`);
+      }
+      if (result.errors.length > 0) {
+        for (const e of result.errors) {
+          console.log(`    ! ${e}`);
+        }
+      }
+
+      // ── Step 2: 复制默认 Skills ──
+      console.log('\n[2/5] 复制 Skills...\n');
+      const skillsSrc = path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills');
+      const skillsDest = path.join(projectRoot, '.github', 'prompts', 'skills');
+      if (fs.existsSync(skillsSrc)) {
+        if (!fs.existsSync(skillsDest)) {
+          fs.mkdirSync(skillsDest, { recursive: true });
+        }
+        const skillFiles = fs.readdirSync(skillsSrc).filter(f => f.endsWith('.md'));
+        for (const f of skillFiles) {
+          const destFile = path.join(skillsDest, f);
+          if (!fs.existsSync(destFile)) {
+            fs.copyFileSync(path.join(skillsSrc, f), destFile);
+            console.log(`    + skills/${f}`);
+          } else {
+            console.log(`    = skills/${f} (已存在，跳过)`);
+          }
+        }
+      }
+
+      // ── Step 3: 复制 hooks + adapter ──
+      console.log('\n[3/5] 复制 hooks + adapter...\n');
+      const hooksSrc = path.join(PACKAGE_ROOT, 'hooks');
+      const adapterSrc = path.join(PACKAGE_ROOT, 'adapters', assistant);
+      const hooksDest = path.join(projectRoot, '.prompts-mcp', 'hooks');
+      const adapterDest = path.join(projectRoot, '.prompts-mcp', 'adapters', assistant);
+
+      if (fs.existsSync(hooksSrc)) {
+        fs.cpSync(hooksSrc, hooksDest, { recursive: true });
+        console.log('    + .prompts-mcp/hooks/');
+      }
+      if (fs.existsSync(adapterSrc)) {
+        fs.cpSync(adapterSrc, adapterDest, { recursive: true });
+        console.log(`    + .prompts-mcp/adapters/${assistant}/`);
+      }
+
+      // ── Step 4: 写入 MCP server 路径 ──
+      console.log('\n[4/5] 配置 MCP server 路径...\n');
+      const mcpCliPath = path.join(PACKAGE_ROOT, 'build', 'cli.js');
+      const mcpConfigDir = path.join(projectRoot, '.prompts-mcp');
+      const mcpConfigPath = path.join(mcpConfigDir, 'mcp-server-path');
+      fs.mkdirSync(mcpConfigDir, { recursive: true });
+      fs.writeFileSync(mcpConfigPath, mcpCliPath, 'utf-8');
+      console.log(`    + .prompts-mcp/mcp-server-path -> ${mcpCliPath}`);
+
+      // ── Step 5: 生成 .claude/settings.json ──
+      if (assistant === 'claude-code') {
+        console.log('\n[5/5] 生成 .claude/settings.json...\n');
+        const settingsDir = path.join(projectRoot, '.claude');
+        const settingsPath = path.join(settingsDir, 'settings.json');
+        fs.mkdirSync(settingsDir, { recursive: true });
+
+        // 保留已有配置，合并 hooks
+        let existingSettings: any = {};
+        if (fs.existsSync(settingsPath)) {
+          try {
+            existingSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+          } catch { /* ignore */ }
+        }
+
+        // hooks 使用相对路径（相对于项目根目录）
+        const hookBase = '.prompts-mcp/adapters/claude-code';
+        const newSettings = {
+          ...existingSettings,
+          hooks: {
+            ...(existingSettings.hooks || {}),
+            SessionStart: [{
+              matcher: '*',
+              hooks: [{
+                type: 'command',
+                command: `bash ${hookBase}/session-start.sh`,
+                statusMessage: 'Loading project context...'
+              }]
+            }],
+            PostToolUse: [{
+              matcher: '*',
+              hooks: [{
+                type: 'command',
+                command: `bash ${hookBase}/normalize-log.sh`,
+                timeout: 5
+              }]
+            }],
+            SessionEnd: [{
+              matcher: '*',
+              hooks: [{
+                type: 'command',
+                command: `bash ${hookBase}/session-end.sh`,
+                statusMessage: 'Finalizing session...',
+                timeout: 30
+              }]
+            }]
+          }
+        };
+
+        fs.writeFileSync(settingsPath, JSON.stringify(newSettings, null, 2), 'utf-8');
+        console.log('    + .claude/settings.json');
+      } else {
+        console.log(`\n[5/5] 跳过（${assistant} 不需要 .claude/settings.json）`);
+      }
+
+      // ── 完成 ──
+      console.log('\n' + '═'.repeat(60));
+      console.log('  Setup 完成！');
+      console.log('═'.repeat(60));
+      console.log('');
+      console.log('下一步：');
+      console.log(`  1. 用 Claude Code 打开项目: ${projectRoot}`);
+      console.log('  2. 新开对话，SessionStart hook 会自动加载上下文');
+      console.log('  3. 智能体会询问你选择哪个角色（Skill）');
+      console.log('  4. 开发完成后智能体会自动优化 Skill');
+      console.log('');
+      break;
+    }
+
     case 'init': {
       const rootIndex = args.indexOf('--project-root');
       const projectRoot = rootIndex !== -1 ? args[rootIndex + 1] : getProjectRoot();
@@ -206,6 +357,7 @@ async function main(): Promise<void> {
       if (assistant === 'claude-code') {
         console.log('Claude Code hooks are configured in .claude/settings.json.');
         console.log('Auto-logging will start on next session.');
+        console.log('TIP: Use "setup" command instead of "init" for full automation (MCP + Skills).');
       } else if (assistant === 'cline') {
         console.log('Configure Cline hooks using the template in .clinerules/hooks/prompts-mcp.json.');
         console.log('See: https://docs.cline.bot/customization/hooks');
