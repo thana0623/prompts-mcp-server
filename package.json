@@ -1,5 +1,5 @@
 {
-  "name": "prompts-mcp-server",
+  "name": "pmcp-server",
   "version": "1.0.0",
   "description": "通用 MCP Server — 自动生成项目 prompts 体系、传递链日志、模块记录、需求澄清与计划生成。可接入任意项目。",
   "type": "module",
@@ -14,20 +14,49 @@
     "adapters/",
     ".github/prompts/skills/"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thana0623/prompts-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thana0623/prompts-mcp-server/issues"
+  },
+  "homepage": "https://github.com/thana0623/prompts-mcp-server#readme",
   "scripts": {
+    "postinstall": "node -e \"console.log('\\x1b[32m%s\\x1b[0m', '✅ pmcp-server installed successfully! Run \\x1b[1mpmcp setup\\x1b[22m to initialize your project.')\"",
+    "prepublishOnly": "npm run build && rm -rf build/__tests__",
     "build": "tsc -p tsconfig.json",
     "start": "node build/index.js",
     "cli": "node build/cli.js",
     "dev": "tsx src/index.ts",
-    "dev:cli": "tsx src/cli.ts"
+    "dev:cli": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/"
   },
-  "keywords": ["mcp", "prompts", "cline", "project-init"],
+  "keywords": [
+    "mcp",
+    "prompts",
+    "ai-context",
+    "project-init",
+    "claude-code",
+    "cline",
+    "cursor",
+    "context-management"
+  ],
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/node": "^20.0.0",
-    "typescript": "^5.3.0"
+    "eslint": "^9.39.4",
+    "prettier": "^3.8.3",
+    "typescript": "^5.3.0",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^4.1.6"
   }
 }

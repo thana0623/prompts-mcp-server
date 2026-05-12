@@ -47,7 +47,7 @@ export const config = {
   assistant: process.env.ASSISTANT || 'claude-code',
 
   /** MCP Server 名称 */
-  serverName: process.env.MCP_SERVER_NAME || 'prompts-mcp-server',
+  serverName: process.env.MCP_SERVER_NAME || 'pmcp-server',
 
   /** MCP Server 版本 */
   serverVersion: process.env.MCP_SERVER_VERSION || '1.0.0',

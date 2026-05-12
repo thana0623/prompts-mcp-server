@@ -15,6 +15,7 @@ import {
   getGeneratedSkillsDir,
   getGlobalSkillsDir,
 } from './config.js';
+import { parseFrontmatter } from './frontmatter.js';
 
 export interface SkillMeta {
   name: string;
@@ -381,35 +382,19 @@ export function isGlobalSkillsInitialized(): boolean {
 // ─── 内部工具 ────────────────────────────────────────────────────────
 
 function parseSkillFile(raw: string, filePath: string): Skill | null {
-  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!fmMatch) {
-    const name = path.basename(filePath, '.md');
-    return {
-      meta: { name, icon: '🎯', description: '', version: 1, created: '', updated: '' },
-      content: raw.trim(),
-      filePath,
-    };
-  }
-
-  const fmLines = fmMatch[1].split('\n');
-  const meta: Record<string, string> = {};
-  for (const line of fmLines) {
-    const idx = line.indexOf(':');
-    if (idx !== -1) {
-      meta[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-    }
-  }
+  const { meta, body } = parseFrontmatter(raw);
+  const name = meta.name || path.basename(filePath, '.md');
 
   return {
     meta: {
-      name: meta.name || path.basename(filePath, '.md'),
+      name,
       icon: meta.icon || '🎯',
       description: meta.description || '',
       version: parseInt(meta.version) || 1,
       created: meta.created || '',
       updated: meta.updated || '',
     },
-    content: fmMatch[2].trim(),
+    content: body || raw.trim(),
     filePath,
   };
 }

@@ -5,7 +5,7 @@
  * 提供 add / commit / status 等基础 git 操作。
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { config } from './config.js';
 
 export interface GitCommitResult {
@@ -26,7 +26,7 @@ export interface GitStatusResult {
  */
 export function isGitRepo(): boolean {
   try {
-    execSync('git rev-parse --is-inside-work-tree', {
+    execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
       cwd: config.projectRoot,
       stdio: 'pipe',
     });
@@ -41,12 +41,12 @@ export function isGitRepo(): boolean {
  */
 export function gitStatus(): GitStatusResult | null {
   try {
-    const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+    const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
       cwd: config.projectRoot,
       encoding: 'utf-8',
     }).trim();
 
-    const status = execSync('git status --porcelain', {
+    const status = execFileSync('git', ['status', '--porcelain'], {
       cwd: config.projectRoot,
       encoding: 'utf-8',
     });
@@ -75,8 +75,8 @@ export function gitStatus(): GitStatusResult | null {
  */
 export function gitAdd(patterns: string[]): boolean {
   try {
-    const args = patterns.length > 0 ? patterns.map(p => `"${p}"`).join(' ') : '-A';
-    execSync(`git add ${args}`, {
+    const args = patterns.length > 0 ? patterns : ['-A'];
+    execFileSync('git', ['add', ...args], {
       cwd: config.projectRoot,
       stdio: 'pipe',
     });
@@ -91,12 +91,12 @@ export function gitAdd(patterns: string[]): boolean {
  */
 export function gitCommit(message: string): GitCommitResult {
   try {
-    execSync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
+    execFileSync('git', ['commit', '-m', message], {
       cwd: config.projectRoot,
       encoding: 'utf-8',
     });
 
-    const hash = execSync('git rev-parse --short HEAD', {
+    const hash = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
       cwd: config.projectRoot,
       encoding: 'utf-8',
     }).trim();

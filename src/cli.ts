@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * prompts-mcp-server CLI
+ * pmcp-server CLI
  * 
  * CLI 入口，提供与 MCP Server 相同的功能。
  * 
@@ -47,8 +47,8 @@ import {
   listSkills,
   initGlobalSkills,
   isGlobalSkillsInitialized,
-  addSkill,
 } from './skills-manager.js';
+import { logDialog } from './dialog-logger.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -683,76 +683,11 @@ async function main(): Promise<void> {
 
       printSeparator('记录对话日志');
       const promptsDir = getPromptsDir();
-      const today = new Date().toISOString().slice(0, 10);
+      const { entryId, today } = logDialog(promptsDir, { title, request, changes, decisions, todos });
 
-      // 读取 nextEntryId
-      const statePath = path.join(promptsDir, 'log-state.json');
-      let entryId = 1;
-      try {
-        if (fs.existsSync(statePath)) {
-          const state = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
-          entryId = state.nextEntryId || 1;
-        }
-      } catch { /* ignore */ }
-
-      // 直接操作文件（简化版）
-      // daily
-      const dailyDir = path.join(promptsDir, 'daily');
-      if (!fs.existsSync(dailyDir)) fs.mkdirSync(dailyDir, { recursive: true });
-      const dailyEntry = [
-        '',
-        `## Entry-${String(entryId).padStart(3, '0')}`,
-        `- 时间: ${new Date().toISOString()}`,
-        `- 标题: ${title}`,
-        `- 清洗后需求: ${request}`,
-        changes.length > 0 ? `- 代码变更: ${changes.join(', ')}` : '',
-        decisions.length > 0 ? `- 技术决策: ${decisions.join('; ')}` : '',
-        todos.length > 0 ? `- 待办: ${todos.join('; ')}` : '',
-        '',
-      ].filter(Boolean).join('\n');
-      fs.appendFileSync(path.join(dailyDir, `${today}.md`), dailyEntry, 'utf-8');
       console.log('✅ daily 日志已追加');
-
-      // recent-5
-      const recentPath = path.join(promptsDir, 'recent-5.md');
-      const newEntry = [
-        `## Entry-${String(entryId).padStart(3, '0')}`,
-        `- 日期: ${today}`,
-        `- 清洗后需求: ${request}`,
-        changes.length > 0 ? `- 代码变更:\n${changes.map(c => `  - ${c}`).join('\n')}` : '- 代码变更: (无)',
-        decisions.length > 0 ? `- 技术决策:\n${decisions.map(d => `  - ${d}`).join('\n')}` : '- 技术决策: (无)',
-        todos.length > 0 ? `- 待办:\n${todos.map(t => `  - ${t}`).join('\n')}` : '- 待办: (无)',
-        '',
-      ].join('\n');
-
-      let recentContent = '';
-      if (fs.existsSync(recentPath)) recentContent = fs.readFileSync(recentPath, 'utf-8');
-      const headerMatch = recentContent.match(/^.*?(?=\n## Entry-)/s);
-      const header = headerMatch ? headerMatch[0].trim() : '# 最近 5 条对话与操作（动态窗口）\n\n> 规则：每次新增 1 条，超过 5 条时删除最旧 1 条。\n';
-      const entries = recentContent.split(/\n(?=## Entry-)/).filter((e: string) => e.startsWith('## Entry-'));
-      entries.push(newEntry);
-      const recentEntries = entries.slice(-5);
-      fs.writeFileSync(recentPath, `${header}\n\n${recentEntries.join('\n')}\n`, 'utf-8');
       console.log('✅ recent-5 已更新');
-
-      // log-state.json
-      let state: any = { nextEntryId: 1, windowId: 'W-0001', windowStartEntry: 1, windowCount: 0, windowEntries: [] };
-      if (fs.existsSync(statePath)) {
-        try { state = JSON.parse(fs.readFileSync(statePath, 'utf-8')); } catch { /* ignore */ }
-      }
-      state.windowEntries.push({ id: entryId, date: today, request, changes, decisions, todos });
-      state.windowCount = state.windowEntries.length;
-      state.nextEntryId = entryId + 1;
-      if (state.windowCount >= 10) {
-        const wn = parseInt(state.windowId.replace('W-', '')) || 1;
-        state.windowId = `W-${String(wn + 1).padStart(4, '0')}`;
-        state.windowStartEntry = entryId + 1;
-        state.windowCount = 0;
-        state.windowEntries = [];
-      }
-      fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
       console.log('✅ log-state.json 已更新');
-
       console.log(`\n📝 Entry-${String(entryId).padStart(3, '0')} (${today}): ${title}`);
       break;
     }

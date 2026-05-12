@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getPromptsDir } from './config.js';
+import { parseFrontmatter } from './frontmatter.js';
 
 export interface RuleMeta {
   name: string;
@@ -127,25 +128,7 @@ export function loadAllRules(): string {
 // ─── 内部工具 ────────────────────────────────────────────────────────
 
 function parseRuleFile(raw: string, filePath: string): Rule | null {
-  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!fmMatch) {
-    // 没有 frontmatter，整个文件作为内容
-    const name = path.basename(filePath, '.md');
-    return {
-      meta: { name, category: 'general', created: '' },
-      content: raw.trim(),
-      filePath,
-    };
-  }
-
-  const fmLines = fmMatch[1].split('\n');
-  const meta: Record<string, string> = {};
-  for (const line of fmLines) {
-    const idx = line.indexOf(':');
-    if (idx !== -1) {
-      meta[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
-    }
-  }
+  const { meta, body } = parseFrontmatter(raw);
 
   return {
     meta: {
@@ -153,7 +136,7 @@ function parseRuleFile(raw: string, filePath: string): Rule | null {
       category: meta.category || 'general',
       created: meta.created || '',
     },
-    content: fmMatch[2].trim(),
+    content: body || raw.trim(),
     filePath,
   };
 }
