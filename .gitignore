@@ -2,5 +2,9 @@ node_modules/
 build/
 dist/
 .env
+.env.local
+*.tgz
 *.tsbuildinfo
 logs/
+.claude/settings.local.json
+.prompts-mcp/

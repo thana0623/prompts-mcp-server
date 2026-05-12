@@ -47,7 +47,6 @@ import {
   listSkills,
   initGlobalSkills,
   isGlobalSkillsInitialized,
-  addSkill,
 } from './skills-manager.js';
 import { logDialog } from './dialog-logger.js';
 import * as fs from 'node:fs';

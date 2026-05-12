@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getProjectRoot, getPromptsDir } from './config.js';
 import { loadAllRules } from './rules-manager.js';
-import { listSkills, formatSkillList } from './skills-manager.js';
+import { formatSkillList } from './skills-manager.js';
 
 export { getProjectRoot, getPromptsDir };
 

@@ -249,11 +249,43 @@ pmcp skill export                                           # 导出项目 skill
 5. 在 `src/cli.ts` 的 `VALID_ASSISTANTS` 中添加名称
 6. 在 setup/init 命令的 switch 中添加配置生成逻辑
 
+## 项目结构
+
+```
+src/
+  index.ts                # MCP Server 入口（工具注册 + 路由）
+  cli.ts                  # CLI 入口（复用核心模块）
+  config.ts               # 集中配置管理
+  frontmatter.ts          # 共享 YAML frontmatter 解析器
+  dialog-logger.ts        # 对话日志模块（daily / recent-5 / summary-10 / log-state / todos）
+  prompts-loader.ts       # 上下文加载（bootstrap）
+  prompts-generator.ts    # 项目扫描 + prompts 文件生成
+  requirements-check.ts   # 需求澄清检查 + 计划生成
+  skills-manager.ts       # 角色技能 CRUD + 分层加载
+  rules-manager.ts        # 项目规范规则管理
+  module-logger.ts        # 模块级变更记录
+  git-utils.ts            # Git 操作（execFileSync，防注入）
+  __tests__/              # 测试文件
+    frontmatter.test.ts
+    requirements-check.test.ts
+```
+
+## 开发
+
+```bash
+npm install
+npm run build        # 编译 TypeScript
+npm test             # 运行测试（vitest）
+npm run dev          # 开发模式运行 MCP Server
+npm run dev:cli      # 开发模式运行 CLI
+```
+
 ## 技术栈
 
 - TypeScript (ES2022, ESM)
 - @modelcontextprotocol/sdk
 - Node.js 运行时
+- Vitest（测试框架）
 - Bash hooks（无外部依赖）
 
 ## 许可证

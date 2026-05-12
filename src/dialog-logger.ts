@@ -161,7 +161,8 @@ export interface WindowEntry {
 
 export function updateLogState(
   promptsDir: string, entryId: number, today: string,
-  request: string, changes: string[], decisions: string[], todos: string[]
+  request: string, changes: string[], decisions: string[], todos: string[],
+  clearWindow: boolean,
 ): void {
   const statePath = path.join(promptsDir, 'log-state.json');
   let state: LogState = {
@@ -190,7 +191,7 @@ export function updateLogState(
   state.windowCount = state.windowEntries.length;
   state.nextEntryId = entryId + 1;
 
-  if (state.windowCount >= 10) {
+  if (clearWindow && state.windowCount >= 10) {
     const windowNum = parseInt(state.windowId.replace('W-', '')) || 1;
     state.windowId = `W-${String(windowNum + 1).padStart(4, '0')}`;
     state.windowStartEntry = entryId + 1;
@@ -254,7 +255,8 @@ export function logDialog(
   appendDailyLog(promptsDir, today, entryId, params.title, params.request, changes, decisions, todos);
   updateRecent5(promptsDir, entryId, today, params.title, params.request, changes, decisions, todos);
   updateSummary10(promptsDir, entryId, today, params.request, changes, decisions, todos);
-  updateLogState(promptsDir, entryId, today, params.request, changes, decisions, todos);
+  // summary 已成功写入后才允许滚动窗口（防止 summary 写入失败时丢失窗口数据）
+  updateLogState(promptsDir, entryId, today, params.request, changes, decisions, todos, true);
 
   if (todos.length > 0) {
     appendTodos(promptsDir, todos);

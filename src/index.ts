@@ -36,14 +36,6 @@ import {
 import {
   bootstrap,
   formatBootstrap,
-  loadContext,
-  loadDaily,
-  loadRecent5,
-  loadSummary10,
-  loadTodos,
-  loadWorkflowLog,
-  loadDevRules,
-  loadLogState,
 } from './prompts-loader.js';
 import { config, getProjectRoot, getPromptsDir } from './config.js';
 import {
@@ -51,7 +43,6 @@ import {
 } from './prompts-generator.js';
 import {
   readModuleLog,
-  listModuleLogs,
   appendModuleLog,
 } from './module-logger.js';
 import {
@@ -64,7 +55,6 @@ import {
   addRule,
   removeRule,
   listRules,
-  readRule,
 } from './rules-manager.js';
 import {
   listSkills,

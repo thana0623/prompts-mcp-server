@@ -224,7 +224,7 @@ function detectHasBackend(files: string[], dirs: string[]): boolean {
   return hasBackDir || hasBackFiles;
 }
 
-function detectFrontendFramework(files: string[], dirs: string[]): string {
+function detectFrontendFramework(files: string[], _dirs: string[]): string {
   const names = new Set(files.map(f => path.basename(f).toLowerCase()));
   if (names.has('vite.config.ts') || names.has('vite.config.js')) return 'Vite';
   if (names.has('vue.config.js')) return 'Vue CLI';
@@ -235,7 +235,7 @@ function detectFrontendFramework(files: string[], dirs: string[]): string {
   return 'Unknown';
 }
 
-function detectBackendFramework(files: string[], dirs: string[]): string {
+function detectBackendFramework(files: string[], _dirs: string[]): string {
   const names = new Set(files.map(f => path.basename(f).toLowerCase()));
   if (names.has('pom.xml')) return 'Spring Boot (Maven)';
   if (names.has('build.gradle') || names.has('build.gradle.kts')) return 'Spring Boot (Gradle)';
