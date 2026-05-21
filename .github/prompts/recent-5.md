@@ -3,36 +3,37 @@
 > Auto-generated from tool-use hooks. Do not edit manually.
 > Showing last 5 state-changing events.
 
-## Event-165
+## Event-171
 
-- **Time**: 2026-05-09 04:58:23
+- **Time**: 2026-05-21 00:36:12
 - **Tool**: `Bash`
-- **Target**: `mkdir -p /tmp/test-pmcp && cd /tmp/test-pmcp && echo '{"name":"demo"}' > package.json && pmcp setup 2>&1 | head -20`
-- **Summary**: Ran: mkdir -p /tmp/test-pmcp && cd /tmp/test-pmcp && echo '{"name":"demo"}' > package.json && pmcp setup 
+- **Target**: `echo '{"tool":"Bash","target":"ls","summary":"Ran: ls","session":"test","time":"2026-05-21T00:35:08.876Z","assistant":"claude-code"}' | bash "C:/admin/Code/Project/prompts-mcp-server/.prompts-mcp/hook`
+- **Summary**: Ran: echo '{"tool":"Bash","target":"ls","summary":"Ran: ls","session":"test","time":"2026-05-21T00:35:08.
 
-## Event-166
+## Event-172
 
-- **Time**: 2026-05-09 04:59:09
+- **Time**: 2026-05-21 00:36:19
 - **Tool**: `Bash`
-- **Target**: `rm -rf /tmp/test-pmcp && mkdir -p /tmp/test-pmcp && echo '{"name":"demo"}' > /tmp/test-pmcp/package.json && pmcp setup /tmp/test-pmcp 2>&1 | tail -10`
-- **Summary**: Ran: rm -rf /tmp/test-pmcp && mkdir -p /tmp/test-pmcp && echo '{"name":"demo"}' > /tmp/test-pmcp/package.
+- **Target**: `cat "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/2026-05-21.jsonl" | tail -3`
+- **Summary**: Ran: cat "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/2026-05-21.jsonl" | tail -3
 
-## Event-167
+## Event-173
 
-- **Time**: 2026-05-09 04:59:15
+- **Time**: 2026-05-21 00:36:30
 - **Tool**: `Bash`
-- **Target**: `rm -rf /tmp/test-pmcp`
-- **Summary**: Ran: rm -rf /tmp/test-pmcp
-## Event-168
+- **Target**: `npm test`
+- **Summary**: Ran: npm test
 
-- **Time**: 2026-05-09 05:00:00
+## Event-174
+
+- **Time**: 2026-05-21 00:36:38
 - **Tool**: `Bash`
-- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && npm run build 2>&1 | tail -5`
-- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && npm run build 2>&1 | tail -5
+- **Target**: `tail -1 "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/2026-05-21.jsonl"`
+- **Summary**: Ran: tail -1 "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/2026-05-21.jsonl"
 
-## Event-169
+## Event-175
 
-- **Time**: 2026-05-09 05:00:04
+- **Time**: 2026-05-21 00:38:32
 - **Tool**: `Bash`
-- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && pmcp setup 2>&1`
-- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && pmcp setup 2>&1
+- **Target**: `ls "C:/admin/Code/Project/prompts-mcp-server/.github/prompts/skills/"`
+- **Summary**: Ran: ls "C:/admin/Code/Project/prompts-mcp-server/.github/prompts/skills/"

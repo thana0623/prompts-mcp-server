@@ -38,6 +38,47 @@ updated: 2026-05-10
 2. 再定义接口
 3. 最后允许开发
 
+## 契约锁死流程（最高优先级，不可跳过）
+
+收到设计需求后，必须按以下顺序执行：
+
+### Phase 0: 契约确认
+
+1. 读取 `.github/prompts/focus-spec.md`
+2. 如果不存在 → 🛑 停止，要求先完成需求预检（Hard Gate）
+3. 如果存在但未被签字确认 → 🛑 停止，等待用户输入 `y`/`approve`
+4. 逐条确认自己理解了 spec 中的断言清单和业务边界
+
+### Phase 1: Schema & API 契约落库（架构版）
+
+> 架构师不写 Java 单元测试。Phase 1 输出 DDL + API 规范文档，作为下游 dev Skill 的底座图纸。
+
+1. 创建任务目录 `.github/prompts/plans/<task-id>/`
+2. 输出 **DDL 文件**：`schema.sql`
+   - 锁死必须字段（如分页必含 `pageNo`/`pageSize`/`total`）
+   - 锁死禁止模式（如禁止物理删除，必须有 `is_deleted` 字段）
+   - 锁死约束（NOT NULL、UNIQUE、FK 关系）
+3. 输出 **API 规范文档**：`api-spec.md`
+   - 每个端点锁死：请求方法、路径、请求体格式、响应体格式
+   - 分页接口必须返回 `{ records: [], total: number, pageNo: number, pageSize: number }`
+   - 禁止使用模糊类型（如 `data: any`、`map: Map<String, Object>`）
+4. 用户确认后，DDL + API-spec 即**锁定为下游不可变的底座图纸**
+
+### Phase 2: 架构设计
+
+1. 模块划分、目录结构、依赖关系设计
+2. 不写业务代码，不写 Controller/Service/Mapper
+3. 输出 ADR 格式决策记录（技术选型对比、风险评估）
+
+### 禁止事项
+
+- 禁止跳过 DDL 和 API-spec 直接设计模块
+- 禁止在 API-spec 中使用模糊字段类型
+- 禁止直接写大量业务代码
+- 禁止修改已确认的 DDL/API-spec（只能新增，不能改已有）
+
+---
+
 ## 开发规范
 
 1. **需求先行**：任何架构决策必须基于明确的需求，不做过度设计

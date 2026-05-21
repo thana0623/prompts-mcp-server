@@ -5,7 +5,7 @@
 
 ## W-0001
 
-- Window progress: 2/10
+- Window progress: 8/10
 
 
 ### Carry Forward
