@@ -1,11 +1,7 @@
 {
-  "taskId": "mvp-runtime-core",
-  "stage": "confirmed",
+  "taskId": "verify-hard-gate-full-chain",
+  "stage": "spec-pending",
   "history": [
-    { "stage": "spec-pending", "entered": "2026-05-21T10:00:00Z", "exited": "2026-05-21T11:00:00Z" },
-    { "stage": "confirmed", "entered": "2026-05-21T11:00:00Z", "note": "架构评审通过，MVP 方案锁定" },
-    { "stage": "implementing", "entered": "2026-05-21T11:30:00Z", "exited": "2026-05-21T11:58:00Z", "note": "commit 5fa3343, ES Module 冲突" },
-    { "stage": "bugfix", "entered": "2026-05-22T00:00:00Z", "exited": "2026-05-22T00:00:00Z", "note": "pre-tool-use.js → .cjs, ES Module 冲突已修复, 全部断言通过" },
-    { "stage": "pending-verification", "entered": "2026-05-22T00:00:00Z", "note": "待在新会话中验证 PreToolUse hook 完整链路" }
+    { "stage": "spec-pending", "entered": "2026-05-22T00:00:00Z", "note": "ES Module 修复完成，准备验证 PreToolUse 完整链路" }
   ]
 }
