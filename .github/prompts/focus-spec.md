@@ -1,6 +1,6 @@
 > task-id: verify-hard-gate-full-chain
 > created: 2026-05-22T00:00:00Z
-> status: pending-confirmation
+> status: confirmed
 
 ## 1. 场景还原
 

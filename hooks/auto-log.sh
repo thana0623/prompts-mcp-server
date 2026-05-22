@@ -34,7 +34,7 @@ try {
   const time = data.time || new Date().toISOString();
 
   // Skip if target contains hook script paths (anti-feedback-loop)
-  if (/auto-log\.sh|process-logs\.sh|session-end\.sh|normalize-log\.sh/.test(target)) return;
+  if (/auto-log\.sh|process-logs\.sh|session-end\.sh|normalize-log\.sh/.test(target)) process.exit(0);
 
   const dateStr = time.slice(0, 10);
   const entry = JSON.stringify({ time, tool, target, summary, session, assistant });
