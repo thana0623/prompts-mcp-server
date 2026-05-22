@@ -8,6 +8,6 @@ dist/
 logs/
 .claude/settings.local.json
 .prompts-mcp/
-!.prompts-mcp/pre-tool-use.js
+!.prompts-mcp/pre-tool-use.cjs
 !.prompts-mcp/pre-tool-use.sh
 .npmrc
