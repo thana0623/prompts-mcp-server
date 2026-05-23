@@ -1175,6 +1175,43 @@ Examples:
       break;
     }
 
+    case 'new-requirement': {
+      printSeparator('新需求声明');
+
+      const promptsDir = getPromptsDir();
+      const statePath = path.join(promptsDir, 'task-state.json');
+      const specPath = path.join(promptsDir, 'focus-spec.md');
+
+      if (!fs.existsSync(statePath)) {
+        console.error('❌ task-state.json 不存在，请先运行 pmcp start 初始化项目。');
+        process.exit(1);
+      }
+
+      const state = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+
+      if (state.stage === 'spec-pending') {
+        console.log('✅ 当前已是 spec-pending 状态，无需重置。');
+        break;
+      }
+
+      state.history.push({
+        stage: 'spec-pending',
+        entered: new Date().toISOString(),
+        note: '用户/AI 声明新需求，重置状态机',
+      });
+      state.stage = 'spec-pending';
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n');
+
+      if (fs.existsSync(specPath)) {
+        fs.writeFileSync(specPath, '> status: expired\n\nfocus-spec 已过期，请通过 analyst 角色重新生成。\n');
+      }
+
+      console.log('✅ 状态已重置为 spec-pending。');
+      console.log('   下一次 Write/Edit 操作将被 Hard Gate 拦截。');
+      console.log('   请通过 analyst 角色生成新的 focus-spec.md 并签字确认后继续开发。');
+      break;
+    }
+
     default: {
       console.error(`未知命令: ${command}`);
       printHelp();

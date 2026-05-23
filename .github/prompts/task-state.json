@@ -1,1 +1,1 @@
-{"taskId":"verify-hard-gate-full-chain","stage":"confirmed","history":[{"stage":"spec-pending","entered":"2026-05-22T00:00:00Z","note":"ES Module 修复完成，准备验证 PreToolUse 完整链路"},{"stage":"confirmed","entered":"2026-05-22T00:00:00Z","note":"用户签字确认，开始验证"}]}
+{"stage":"confirmed","taskId":"test"}
