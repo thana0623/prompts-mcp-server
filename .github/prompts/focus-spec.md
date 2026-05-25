@@ -8,6 +8,7 @@
 - 层 1：PostToolUse 写入时预警
 - 层 2：Git pre-commit 提交时硬拦截
 - 去掉 session-end 的 `--no-verify`，让自动提交也走检查
+- 将 Git 提交纪律写入开发规范
 
 ## 2. 核心业务边界
 
@@ -18,6 +19,7 @@ IN: .claude/settings.json
 IN: .prompts-mcp/hooks/scan-secrets.sh
 IN: .prompts-mcp/hooks/post-write-scan.sh
 IN: .prompts-mcp/pre-tool-use.cjs
+IN: .github/prompts/dev-rules.md
 OUT: src/index.ts
 OUT: src/cli.ts
 OUT: src/prompts-loader.ts
