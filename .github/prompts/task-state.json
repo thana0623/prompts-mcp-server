@@ -1,16 +1,12 @@
 {
-  "stage": "confirmed",
-  "taskId": "secret-scanning-guard",
+  "stage": "spec-pending",
+  "taskId": null,
   "history": [
     {
-      "stage": "spec-pending",
-      "entered": "2026-05-25T15:00:00Z",
-      "note": "敏感信息检测两层防护"
-    },
-    {
       "stage": "confirmed",
-      "entered": "2026-05-25T15:01:00Z",
-      "note": "用户确认继续"
+      "entered": "2026-05-25T15:00:00Z",
+      "exited": "2026-05-25T10:00:00Z",
+      "note": "secret-scanning-guard 已完成并归档"
     }
   ]
 }
