@@ -1,39 +1,36 @@
-> task-id: simplify-architecture
-> created: 2026-05-24T12:00:00Z
+> task-id: observability-and-archive
+> created: 2026-05-25T11:50:00Z
 > status: confirmed
 
 ## 1. 场景还原
 
-pmcp 系统存在过度设计：`.claude/skills/` 转换层不可靠（Windows bug）、`active-role` 多余、`auto-log.sh` 实时 recent-5 更新属锦上添花。本次精简架构，砍掉不可靠和冗余组件，保留硬防线。
+用户对系统运行状态感知度低，不知道日志压缩是否正常工作。同时新需求会直接覆盖未完成的 focus-spec，导致进度丢失。需要：
+- 启动时显示系统健康摘要（C）
+- 提供手动检查命令 `pmcp status`（B）
+- 新任务前自动归档旧 focus-spec（A）
 
 ## 2. 核心业务边界
 
-IN: src/cli.ts
-IN: src/prompts-loader.ts
-IN: hooks/auto-log.sh
-IN: hooks/process-logs.sh
-IN: .prompts-mcp/hooks/auto-log.sh
-IN: .prompts-mcp/hooks/process-logs.sh
-IN: adapters/claude-code/session-start.sh
-IN: .prompts-mcp/adapters/claude-code/session-start.sh
-IN: .github/prompts/focus-spec.md
-IN: .prompts-mcp/pre-tool-use.cjs
-IN: package.json
+IN: src/cli.ts（添加 status 命令）
+IN: src/prompts-loader.ts（添加状态加载逻辑）
+IN: adapters/claude-code/session-start.sh（添加启动摘要）
+IN: .prompts-mcp/adapters/claude-code/session-start.sh（同上）
+IN: hooks/process-logs.sh（添加归档逻辑）
+IN: .github/prompts/focus-spec-history（归档目录）
 OUT: src/index.ts
-OUT: adapters/claude-code/settings.json
+OUT: 数据库相关文件
 
 ## 3. 禁止触碰黑名单
 
 - 禁止删除 PreToolUse hook（scope 校验是唯一硬防线）
 - 禁止修改 task-state.json schema
-- 禁止修改 parseFrontmatter 函数
 - 禁止删除 SessionStart 补处理逻辑
 
 ## 4. 核心测试断言清单
 
-- assertCompilePass()
-- assertStringContains(bootstrap 输出, 角色列表来自 .github/prompts/skills/ 而非 .claude/skills/)
-- assertFalse(fs.existsSync('.claude/skills/')) ← 不再生成此目录
-- SessionStart 补处理逻辑保留
-- PreToolUse scope 校验保留
-- npm test 25/25
+- assertEqual(pmcp status exit code, 0)
+- assertStringContains(pmcp status output, "Window")
+- assertStringContains(pmcp status output, "Event-")
+- assertFileExists(.github/prompts/focus-spec-history/)
+- assertEqual(pmcp new-requirement 归档旧文件数, 1)
+- assertStringContains(session-start 输出, "最近事件")
