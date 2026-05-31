@@ -1,7 +1,26 @@
 {
-  "nextEntryId": 497,
-  "windowId": "W-0013",
-  "windowCount": 3,
-  "lastProcessedDate": "2026-05-25",
-  "lastProcessedCount": 64
+  "nextEntryId": 560,
+  "windowId": "W-0019",
+  "windowCount": 6,
+  "lastProcessedDate": "2026-05-28",
+  "lastProcessedCount": 126,
+  "windowEntries": [
+    {
+      "id": 559,
+      "date": "2026-05-31",
+      "request": "修复 pmcp start 角色系统 7 个问题",
+      "changes": [
+        "新增 database-handler.md",
+        "skills-manager.ts: EXCLUDED_SKILLS",
+        "prompts-loader.ts: 4级路径提示",
+        "cli.ts: 自动同步skill",
+        "README.md: 版本对齐"
+      ],
+      "decisions": [
+        "ecc-workflow排除出角色列表",
+        "database-handler通用版"
+      ],
+      "todos": []
+    }
+  ]
 }

@@ -1,8 +1,29 @@
 {
-  "stage": "confirmed",
-  "taskId": "enforce-contract-immutability",
-  "contractHash": "806598d69fc4f93f7854e1016718d59a77083f69a8765d2c8c817157f5f11fcc",
+  "stage": "archived",
+  "taskId": "fix-pmcp-start-skill-system",
+  "contractHash": "e5e0352facaa85c07075364c42a90aeeeb8c075eb778a3150b74c239575cfc4f",
   "history": [
+    {
+      "stage": "archived",
+      "entered": "2026-05-31T00:15:00+08:00",
+      "exited": "2026-05-31T00:02:00+08:00",
+      "note": "fix-pmcp-start-skill-system 已完成并归档：7 个问题全部修复"
+    },
+    {
+      "stage": "confirmed",
+      "entered": "2026-05-31T00:02:00+08:00",
+      "note": "需求签字确认：fix-pmcp-start-skill-system，hash 已存储"
+    },
+    {
+      "stage": "spec-pending",
+      "entered": "2026-05-31T00:01:00+08:00",
+      "note": "重置为 spec-pending 以写入修复文件"
+    },
+    {
+      "stage": "confirmed",
+      "entered": "2026-05-31T00:00:00+08:00",
+      "note": "需求签字确认：fix-pmcp-start-skill-system"
+    },
     {
       "stage": "confirmed",
       "entered": "2026-05-28T01:10:00+08:00",
