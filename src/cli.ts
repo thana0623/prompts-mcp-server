@@ -204,13 +204,13 @@ async function main(): Promise<void> {
           console.log(`    + ${f}`);
         }
 
-        // 初始化全局 skill 仓库
-        if (!isGlobalSkillsInitialized()) {
+        // 初始化全局 skill 仓库（同步新增 skill）
+        {
           const globalResult = initGlobalSkills({
             sourceDir: path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills'),
           });
-          if (globalResult.success) {
-            console.log('    + 全局 skill 仓库已初始化');
+          if (globalResult.success && globalResult.created.length > 0) {
+            console.log('    + 全局 skill 仓库已同步');
           }
         }
 
@@ -318,20 +318,46 @@ async function main(): Promise<void> {
           fs.cpSync(adapterSrc, adapterDest, { recursive: true });
         }
         console.log('    = Hook 脚本已更新到最新版本');
+
+        // 同步新增 skill 文件到项目
+        const skillsSrc = path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills');
+        const skillsDest = path.join(projectRoot, '.github', 'prompts', 'skills');
+        if (fs.existsSync(skillsSrc)) {
+          if (!fs.existsSync(skillsDest)) {
+            fs.mkdirSync(skillsDest, { recursive: true });
+          }
+          const skillFiles = fs.readdirSync(skillsSrc).filter(f => f.endsWith('.md'));
+          let synced = 0;
+          for (const f of skillFiles) {
+            const destFile = path.join(skillsDest, f);
+            if (!fs.existsSync(destFile)) {
+              fs.copyFileSync(path.join(skillsSrc, f), destFile);
+              synced++;
+            }
+          }
+          if (synced > 0) {
+            console.log(`    + 新增 skill 已同步: ${synced} 个`);
+          }
+        }
       }
 
-      // ── Step 2: 确保全局 skill 仓库存在 ──
+      // ── Step 2: 确保全局 skill 仓库存在 + 同步新增 skill ──
       console.log('[2/4] 检查全局 Skill 仓库...\n');
 
-      if (!isGlobalSkillsInitialized()) {
+      {
         const globalResult = initGlobalSkills({
           sourceDir: path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills'),
         });
         if (globalResult.success) {
-          console.log('    + 全局 skill 仓库已初始化');
+          if (globalResult.created.length > 0) {
+            console.log('    + 全局 skill 仓库已同步');
+            for (const f of globalResult.created) {
+              console.log(`      + ${path.basename(f)}`);
+            }
+          } else {
+            console.log('    = 全局 skill 仓库已完整');
+          }
         }
-      } else {
-        console.log('    = 全局 skill 仓库已存在');
       }
 
       // ── Step 3: 加载上下文 ──
@@ -339,46 +365,37 @@ async function main(): Promise<void> {
       const bootstrapResult = bootstrap();
       console.log(formatBootstrap(bootstrapResult));
 
-      // ── Step 3.5: ECC 检测与引导 ──
-      const homeDir = process.env.HOME || process.env.USERPROFILE || '~';
-      const eccRulesDir = path.join(homeDir, '.claude', 'rules', 'ecc');
-      if (fs.existsSync(eccRulesDir)) {
-        console.log('═══════════════════════════════════════════════════════════');
-        console.log('  ECC 已安装');
-        console.log('═══════════════════════════════════════════════════════════');
-        console.log('');
-        console.log('  ECC (Everything Claude Code) 提供企业级开发能力：');
-        console.log('');
-        console.log('  可用命令:');
-        console.log('    /tdd            测试驱动开发');
-        console.log('    /code-review    代码质量审查');
-        console.log('    /security-scan  安全扫描');
-        console.log('    /plan           实现规划');
-        console.log('    /build-fix      构建错误修复');
-        console.log('');
-        console.log('  PMCP + ECC 分工:');
-        console.log('    PMCP 管上下文（需求契约、模块记录、对话日志）');
-        console.log('    ECC  管行为（质量门禁、TDD、代码审查、安全扫描）');
-        console.log('');
-        console.log('  建议流程: 选角色 → 开发 → /code-review → /security-scan → 提交');
-        console.log('');
-      }
-
-      // ── Step 4: Skill 选择提示 ──
-      console.log('\n[4/4] Skill 选择\n');
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('  请选择角色（说出角色名即可）：');
-      console.log('═══════════════════════════════════════════════════════════');
-      console.log('');
+      // ── Step 4: 角色选择提示（终端摘要） ──
       const skills = listSkills();
       const maxNameLen = Math.max(...skills.map(s => s.meta.name.length));
-      for (const s of skills) {
-        const padded = s.meta.name.padEnd(maxNameLen + 2);
-        console.log(`  ${padded}${s.meta.description}`);
+
+      if (bootstrapResult.hasEcc) {
+        console.log('\n[4/4] ECC 工作流\n');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('  ECC 已检测 → 进入 ECC 工作流');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('');
+        for (const s of skills) {
+          const padded = s.meta.name.padEnd(maxNameLen + 2);
+          console.log(`  ${padded}${s.meta.description}`);
+        }
+        console.log('');
+        console.log('  流程: 选角色 → 需求门控 → /plan → /tdd → /code-review → /security-scan → 提交');
+        console.log('');
+      } else {
+        console.log('\n[4/4] Skill 选择\n');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('  请选择角色（说出角色名即可）：');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('');
+        for (const s of skills) {
+          const padded = s.meta.name.padEnd(maxNameLen + 2);
+          console.log(`  ${padded}${s.meta.description}`);
+        }
+        console.log('');
+        console.log('  直接说出角色名，或描述你的需求。');
+        console.log('');
       }
-      console.log('');
-      console.log('  直接说出角色名，或描述你的需求。');
-      console.log('');
 
       break;
     }
@@ -427,13 +444,20 @@ async function main(): Promise<void> {
       // ── Step 2: 初始化全局 Skill 仓库 + 复制项目 Skills ──
       console.log('\n[2/5] 初始化 Skill 系统...\n');
 
-      // 初始化全局 skill 仓库
-      if (!isGlobalSkillsInitialized()) {
+      // 初始化全局 skill 仓库（同步新增 skill）
+      {
         const globalResult = initGlobalSkills({
           sourceDir: path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills'),
         });
         if (globalResult.success) {
-          console.log('    + 全局 skill 仓库已初始化');
+          if (globalResult.created.length > 0) {
+            console.log('    + 全局 skill 仓库已同步');
+            for (const f of globalResult.created) {
+              console.log(`      + ${path.basename(f)}`);
+            }
+          } else {
+            console.log('    = 全局 skill 仓库已完整');
+          }
           console.log(`      路径: ${getGlobalSkillsDir()}`);
         } else {
           console.log('    ! 全局 skill 仓库初始化失败');
@@ -441,8 +465,6 @@ async function main(): Promise<void> {
             console.log(`      ${e}`);
           }
         }
-      } else {
-        console.log('    = 全局 skill 仓库已存在');
       }
 
       // 复制默认 skill 到项目（向后兼容）

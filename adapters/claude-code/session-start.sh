@@ -125,7 +125,56 @@ if [ ! -d "$GLOBAL_SKILLS_DIR/core" ]; then
   echo ""
 fi
 
-# Step 0: Process any unprocessed logs from previous sessions
+# Step 0: Contract integrity check
+STATE_FILE="$PROJECT_DIR/$PROMPTS_SUBDIR/task-state.json"
+SPEC_FILE="$PROJECT_DIR/$PROMPTS_SUBDIR/focus-spec.md"
+if [ -f "$STATE_FILE" ] && [ -f "$SPEC_FILE" ]; then
+  STAGE=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).stage||'')}catch(e){console.log('')}")
+  if [ "$STAGE" = "confirmed" ]; then
+    STORED_HASH=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).contractHash||'')}catch(e){console.log('')}")
+    if [ -n "$STORED_HASH" ]; then
+      ACTUAL_HASH=$(node -e "const c=require('crypto'),f=require('fs');console.log(c.createHash('sha256').update(f.readFileSync(process.argv[1],'utf8')).digest('hex'))" "$SPEC_FILE" 2>/dev/null)
+      if [ "$STORED_HASH" != "$ACTUAL_HASH" ]; then
+        echo ""
+        echo "## ⚠️ 契约完整性校验失败"
+        echo ""
+        echo "focus-spec.md 在上次确认后被修改，hash 不匹配。"
+        echo "stage 已回退到 spec-pending，请重新确认需求。"
+        echo ""
+        # Force stage back to spec-pending
+        node -e "
+          const fs=require('fs'),p='$STATE_FILE';
+          const s=JSON.parse(fs.readFileSync(p,'utf8'));
+          s.stage='spec-pending';
+          s.history=s.history||[];
+          s.history.unshift({stage:'spec-pending',entered:new Date().toISOString(),note:'session-start hash 校验失败，契约被篡改'});
+          fs.writeFileSync(p,JSON.stringify(s,null,2)+'\n');
+        "
+      fi
+    fi
+  fi
+fi
+
+# Step 0.5: Stage-aware lifecycle guidance
+if [ -f "$STATE_FILE" ]; then
+  STAGE=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).stage||'')}catch(e){console.log('')}")
+  if [ "$STAGE" = "completed" ]; then
+    echo ""
+    echo "## 📋 上一个需求已完成"
+    echo ""
+    echo "开发阶段已结束。请检查 focus-spec.md 中的 TODO 是否全部完成。"
+    echo "完成后输入「归档」以归档当前需求，然后可以开始新需求。"
+    echo ""
+  elif [ "$STAGE" = "archived" ]; then
+    echo ""
+    echo "## ✅ 已归档"
+    echo ""
+    echo "上一个需求已归档完成。可以开始新需求。"
+    echo ""
+  fi
+fi
+
+# Step 1: Process any unprocessed logs from previous sessions
 # This ensures recent-5.md and summary-10.md are up-to-date even if
 # the previous session's SessionEnd hook didn't run (crash, force quit, etc.)
 HOOKS_DIR="$PROJECT_DIR/.prompts-mcp/hooks"

@@ -20,15 +20,73 @@
 
 ### 1. 一案一结（Lifecycle）
 
-`focus-spec.md` 在当前大任务完成前持续有效。强制重置触发条件：
+`focus-spec.md` 有完整的 5 阶段生命周期：
 
-- 用户执行 `/clear` 清空会话
-- 用户说出「新需求」「新模块」「换一个任务」「下一个」等切换关键词
-- 上一个任务已完成并 `git commit`
+```
+spec-pending → confirmed → completed → archived → spec-pending（新需求）
+                  ↓            ↓
+              开发中遇新问题  开发完成，TODO 未完成
+                  ↓            ↓
+           change-requested  禁写，引导完成 TODO
+                  ↓
+              更新需求 → confirmed
+```
 
-重置后必须重新走 Hard Gate 预检流程。
+#### 阶段定义
 
-检测到切换关键词时，智能体必须主动提问：「检测到新任务，是否重置 focus-spec？[y/保留]」
+| 阶段 | focus-spec | 其他文件 | 含义 |
+|------|-----------|---------|------|
+| spec-pending | 可写 | 拦截 | 需求预检中，AI 正在写 focus-spec |
+| confirmed | 锁定 | IN 范围内可写 | 已签字，开发中 |
+| change-requested | 可写 | 可写 | 需求变更中，用户已授权修改 |
+| completed | 可写 | 拦截 | 开发完成，TODO 待完成 |
+| archived | 不检查 | 放行 | 全部完成，引导新需求 |
+
+#### 阶段转换条件
+
+- **spec-pending → confirmed**：用户签字（输入 `y` 或 `approve`）
+- **confirmed → completed**：开发完成（代码 + 测试 + review + git commit）
+- **confirmed → change-requested**：开发中遇新问题，用户说「需求变更」「改需求」
+- **change-requested → confirmed**：需求更新后重新签字
+- **completed → archived**：focus-spec 的 TODO 全部完成，归档提交
+- **archived → spec-pending**：用户提新需求
+
+#### 追加内容规则（关键）
+
+**超出原始契约范围的追加，必须走 change-requested 流程。**
+
+- confirmed 阶段发现需要追加功能 → 停止开发 → 用户说「需求变更」→ 切换到 change-requested
+- 在 change-requested 阶段更新 focus-spec.md（新增 IN 范围、新增断言）
+- 更新完成后用户重新签字 → 回到 confirmed
+- **禁止在 confirmed 阶段直接追加契约外内容而不更新 focus-spec**
+
+#### 归档规则
+
+归档前检查清单：
+- [ ] 所有代码变更已 git commit
+- [ ] 测试通过
+- [ ] review 完成
+- [ ] focus-spec.md 中的 TODO 全部完成
+
+归档操作：
+1. 将 `focus-spec.md` 移动到 `focus-spec-history/<task-id>-<date>.md`
+2. 重置 `task-state.json`：stage 改为 `spec-pending`，清空 taskId 和 contractHash
+3. 清空或删除 `focus-spec.md`
+
+归档后引导：
+- 智能体提示：「已归档，可以开始新需求。」
+- 用户提新需求时，自动进入 Hard Gate 预检流程
+
+#### 需求切换检测
+
+检测到以下关键词时，智能体必须检查当前 stage：
+- 「新需求」「新模块」「换一个任务」「下一个」「下一个需求」
+
+处理逻辑：
+- stage=completed → 提示「请先完成 TODO 并归档」
+- stage=confirmed → 提示「当前需求进行中，是否需求变更？」
+- stage=archived → 直接进入新需求流程
+- stage=spec-pending → 继续当前预检
 
 ### 2. Assert Contract（断言契约）
 
@@ -84,6 +142,29 @@ Fast-Track 下：
 - 本地可多次提交
 - 功能验证通过后统一推送
 - 推送前确认无敏感信息泄露（pre-commit hook 自动检查）
+
+---
+
+### 5. 开发工作流（角色协作顺序）
+
+标准开发周期按以下 Phase 顺序执行，每个 Phase 对应一个角色：
+
+| Phase | 角色 | 产出 |
+|-------|------|------|
+| Phase 1 | analyst | `focus-spec.md`（需求契约，人类签字确认） |
+| Phase 2 | architect | `plans/<task-id>/`（架构设计、ADR 决策记录） |
+| Phase 3 | backend / frontend | 实现代码 |
+| Phase 4 | review | 审核报告 |
+| Phase 5 | 开发角色 | 测试合并 |
+
+**PR 流程（单人开发模式）：**
+
+1. 开发完成后，commit message 标记 `PR: ready for review`
+2. 切换到 **review** 角色，读取 diff 并输出审核报告
+3. review 通过 → commit message 标记 `review: approved` → 开发角色执行合并
+4. review 不通过 → 输出问题清单 → 开发角色修复后重新提交
+
+> review 不直接改代码。review 的产出是审核报告，代码修复由开发角色完成。
 
 ---
 

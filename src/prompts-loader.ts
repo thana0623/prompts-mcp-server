@@ -56,6 +56,12 @@ export interface LoadedContext {
   path: string;
 }
 
+export interface TaskState {
+  stage: string;
+  taskId: string | null;
+  history?: { stage: string; entered: string; exited?: string; note?: string }[];
+}
+
 export interface BootstrapResult {
   context: LoadedContext;
   daily: LoadedContext | null;
@@ -68,6 +74,8 @@ export interface BootstrapResult {
   modules: string[];
   skills: string;
   focusSpec: LoadedContext | null;
+  taskState: TaskState | null;
+  hasEcc: boolean;
 }
 
 // ─── Prompt Loaders ──────────────────────────────────────────────────
@@ -122,6 +130,11 @@ export function loadLogState(): LogState | null {
   return readJsonSafe<LogState>(filePath);
 }
 
+export function loadTaskState(): TaskState | null {
+  const filePath = path.join(getPromptsDir(), 'task-state.json');
+  return readJsonSafe<TaskState>(filePath);
+}
+
 export function listModules(): string[] {
   const modulesDir = path.join(getPromptsDir(), 'modules');
   try {
@@ -151,8 +164,12 @@ export function bootstrap(): BootstrapResult {
   const modules = listModules();
   const skills = formatSkillList();
   const focusSpec = loadFocusSpec();
+  const taskState = loadTaskState();
 
-  return { context, daily, recent5, summary10, todos, devRules, userRules, logState, modules, skills, focusSpec };
+  const homeDir = process.env.HOME || process.env.USERPROFILE || '~';
+  const hasEcc = fs.existsSync(path.join(homeDir, '.claude', 'rules', 'ecc'));
+
+  return { context, daily, recent5, summary10, todos, devRules, userRules, logState, modules, skills, focusSpec, taskState, hasEcc };
 }
 
 /**
@@ -165,99 +182,147 @@ export function formatBootstrap(result: BootstrapResult): string {
   lines.push('');
 
   // ─── Hard Gate: 需求预检（最高优先级，必须最先输出） ───
-  lines.push('## 🛑🛑🛑 HARD GATE：需求预检 [最高优先级 - 不可跳过] 🛑🛑🛑');
-  lines.push('');
-  lines.push('> ⚠️ 此关卡在所有 Skill 选择之前。未通过此关卡，禁止一切写操作和分析工作。');
-  lines.push('> ⚠️ 即使用户指定了角色（如"architect"），也必须先完成预检。角色选择不等于跳过预检。');
-  lines.push('');
+  // 当 task-state.json 的 stage 为 archived 时，跳过门控（需求已完成归档）
+  const isArchived = result.taskState?.stage === 'archived';
 
-  if (!result.focusSpec || !result.focusSpec.content) {
-    // focus-spec.md 不存在 — 强制预检
-    lines.push('### ❌ focus-spec.md 不存在');
+  if (!isArchived) {
+    lines.push('## 🛑🛑🛑 HARD GATE：需求预检 [最高优先级 - 不可跳过] 🛑🛑🛑');
     lines.push('');
-    lines.push('```');
-    lines.push('╔══════════════════════════════════════════════════════════════════╗');
-    lines.push('║  🛑 STOP — 你必须立即停止一切工作，执行以下操作：                 ║');
-    lines.push('╠══════════════════════════════════════════════════════════════════╣');
-    lines.push('║  1. 停止：不要分析代码、不要检查进度、不要执行任何任务            ║');
-    lines.push('║  2. 提问：向用户询问本次要做什么任务                              ║');
-    lines.push('║  3. 生成：对话式澄清后生成 .github/prompts/focus-spec.md          ║');
-    lines.push('║  4. 等待：提示用户输入 y/approve 签字                            ║');
-    lines.push('║  5. 收到 y/approve 之前，禁止 Write/Edit/Bash(写) 和任务分析      ║');
-    lines.push('╚══════════════════════════════════════════════════════════════════╝');
-    lines.push('```');
+    lines.push('> ⚠️ 此关卡在所有 Skill 选择之前。未通过此关卡，禁止一切写操作和分析工作。');
+    lines.push('> ⚠️ 即使用户指定了角色（如"architect"），也必须先完成预检。角色选择不等于跳过预检。');
     lines.push('');
-    lines.push('**允许的操作**：Read / Glob / Grep（只读类，仅用于理解项目结构）');
-    lines.push('**禁止的操作**：Write / Edit / Bash（写操作类）、任务分析、代码审查、进度检查');
-    lines.push('');
-    lines.push('> 💡 正确流程：先问用户"本次要做什么" → 澄清需求 → 生成 focus-spec → 签字 → 再开始工作');
-    lines.push('');
-  } else {
-    // focus-spec.md 存在 — 判断是否已签字确认
-    const specContent = result.focusSpec.content;
-    const isConfirmed = specContent.includes('status: confirmed') || specContent.includes('status: approved');
-    const isFastTrack = specContent.includes('assertCompilePass()');
+  }
 
-    if (!isConfirmed) {
-      // 存在但未确认
-      lines.push('### ⚠️ focus-spec.md 存在但未签字确认');
+  if (!isArchived) {
+    if (!result.focusSpec || !result.focusSpec.content) {
+      // focus-spec.md 不存在 — 强制预检
+      lines.push('### ❌ focus-spec.md 不存在');
       lines.push('');
       lines.push('```');
       lines.push('╔══════════════════════════════════════════════════════════════════╗');
-      lines.push('║  🛑 STOP — 契约文档等待人类签字：                                 ║');
+      lines.push('║  🛑 STOP — 你必须立即停止一切工作，执行以下操作：                 ║');
       lines.push('╠══════════════════════════════════════════════════════════════════╣');
-      lines.push('║  1. 向用户展示 focus-spec.md 内容摘要                            ║');
-      lines.push('║  2. 明文提示：「请审查。输入 y/approve 签字，或描述修改意见」    ║');
-      lines.push('║  3. 收到 y/approve 后，将 status 改为 confirmed                  ║');
-      lines.push('║  4. 签字确认前，禁止一切写操作和任务分析                          ║');
+      lines.push('║  1. 停止：不要分析代码、不要检查进度、不要执行任何任务            ║');
+      lines.push('║  2. 提问：向用户询问本次要做什么任务                              ║');
+      lines.push('║  3. 生成：对话式澄清后生成 .github/prompts/focus-spec.md          ║');
+      lines.push('║  4. 等待：提示用户输入 y/approve 签字                            ║');
+      lines.push('║  5. 收到 y/approve 之前，禁止 Write/Edit/Bash(写) 和任务分析      ║');
       lines.push('╚══════════════════════════════════════════════════════════════════╝');
       lines.push('```');
       lines.push('');
+      lines.push('**允许的操作**：Read / Glob / Grep（只读类，仅用于理解项目结构）');
+      lines.push('**禁止的操作**：Write / Edit / Bash（写操作类）、任务分析、代码审查、进度检查');
+      lines.push('');
+      lines.push('> 💡 正确流程：先问用户"本次要做什么" → 澄清需求 → 生成 focus-spec → 签字 → 再开始工作');
+      lines.push('');
     } else {
-      // 已确认
-      lines.push('### ✅ focus-spec.md 已签字确认');
-      lines.push('');
-      if (isFastTrack) {
-        lines.push('> ⚡ Fast-Track 模式：断言 = `assertCompilePass()`');
+      // focus-spec.md 存在 — 判断是否已签字确认
+      const specContent = result.focusSpec.content;
+      const isConfirmed = specContent.includes('status: confirmed') || specContent.includes('status: approved');
+      const isFastTrack = specContent.includes('assertCompilePass()');
+
+      if (!isConfirmed) {
+        // 存在但未确认
+        lines.push('### ⚠️ focus-spec.md 存在但未签字确认');
+        lines.push('');
+        lines.push('```');
+        lines.push('╔══════════════════════════════════════════════════════════════════╗');
+        lines.push('║  🛑 STOP — 契约文档等待人类签字：                                 ║');
+        lines.push('╠══════════════════════════════════════════════════════════════════╣');
+        lines.push('║  1. 向用户展示 focus-spec.md 内容摘要                            ║');
+        lines.push('║  2. 明文提示：「请审查。输入 y/approve 签字，或描述修改意见」    ║');
+        lines.push('║  3. 收到 y/approve 后，将 status 改为 confirmed                  ║');
+        lines.push('║  4. 签字确认前，禁止一切写操作和任务分析                          ║');
+        lines.push('╚══════════════════════════════════════════════════════════════════╝');
+        lines.push('```');
+        lines.push('');
       } else {
-        lines.push('> 📋 完整模式：详见 focus-spec.md 第 4 章断言清单');
+        // 已确认
+        lines.push('### ✅ focus-spec.md 已签字确认');
+        lines.push('');
+        if (isFastTrack) {
+          lines.push('> ⚡ Fast-Track 模式：断言 = `assertCompilePass()`');
+        } else {
+          lines.push('> 📋 完整模式：详见 focus-spec.md 第 4 章断言清单');
+        }
+        lines.push('');
+        lines.push('**契约已锁定。后续编码禁止修改已确认的断言。**');
+        lines.push('');
       }
-      lines.push('');
-      lines.push('**契约已锁定。后续编码禁止修改已确认的断言。**');
-      lines.push('');
     }
+
+    // 生命周期检测提示
+    lines.push('### 🔄 生命周期');
+    lines.push('');
+    lines.push('- 触发「新需求」「新模块」「换一个任务」→ 主动提问是否重置 focus-spec');
+    lines.push('- `/clear` 后 focus-spec 自动过期，需重新预检');
+    lines.push('- 任务完成并 git commit 后 focus-spec 自动过期');
+    lines.push('');
+  } else {
+    // archived — 门控已通过，显示简要状态
+    lines.push('### ✅ 需求已归档（HARD GATE 已跳过）');
+    lines.push('');
   }
 
-  // 生命周期检测提示
-  lines.push('### 🔄 生命周期');
-  lines.push('');
-  lines.push('- 触发「新需求」「新模块」「换一个任务」→ 主动提问是否重置 focus-spec');
-  lines.push('- `/clear` 后 focus-spec 自动过期，需重新预检');
-  lines.push('- 任务完成并 git commit 后 focus-spec 自动过期');
-  lines.push('');
   lines.push('---');
   lines.push('');
 
-  // Skill 选择提示 — 放在 Hard Gate 之后
+  // 角色选择 + 工作流引导 — 放在 Hard Gate 之后
   if (result.skills) {
-    lines.push('## ⚡ 选择你的角色');
-    lines.push('');
-    lines.push('在通过 Hard Gate 预检后，**必须**先询问用户想以哪个角色开发。');
-    lines.push('');
-    lines.push('**角色加载协议：用户说出角色名时，Read 对应文件：**');
-    lines.push('');
     const skills = result.skills.split('\n').filter(l => l.startsWith('|') && !l.startsWith('|---') && !l.startsWith('| #'));
+    const skillList: { name: string; desc: string }[] = [];
     for (const s of skills) {
       const nameMatch = s.match(/\*\*(\S+)\*\*/);
       const name = nameMatch ? nameMatch[1] : '';
       const descMatch = s.match(/\| ([^|]+?) \| v/);
       const desc = descMatch ? descMatch[1].replace(/\*\*/g, '').trim() : '';
-      if (name) {
-        lines.push(`- **${name}** — ${desc}`);
-      }
+      if (name) skillList.push({ name, desc });
     }
-    lines.push('');
-    lines.push('> 用户只需说角色名（如"用 analyst 角色"），直接 Read `.github/prompts/skills/<name>.md` 并按其身份行事。');
+
+    if (result.hasEcc) {
+      // ECC 工作流：PMCP 管需求 + ECC 管开发
+      lines.push('## ⚡ ECC 工作流');
+      lines.push('');
+      lines.push('ECC 已检测到。PMCP 管「做什么」，ECC 管「怎么做」。');
+      lines.push('');
+      lines.push('**请先询问用户想以哪个角色开发：**');
+      lines.push('');
+      for (const s of skillList) {
+        lines.push(`- **${s.name}** — ${s.desc}`);
+      }
+      lines.push('');
+      lines.push('**工作流（按顺序执行）：**');
+      lines.push('');
+      lines.push('1. 选角色（上方列表）');
+      lines.push('2. PMCP: 需求门控 → analyst 输出 focus-spec.md → 人类签字');
+      lines.push('3. ECC:  /plan → planner agent 生成实现计划');
+      lines.push('4. ECC:  /tdd → tdd-guide 驱动 RED-GREEN-REFACTOR');
+      lines.push('5. ECC:  /code-review → code-reviewer 检查质量');
+      lines.push('6. ECC:  /security-scan → security-reviewer 检查漏洞');
+      lines.push('7. PMCP: 自动日志 + git commit');
+      lines.push('');
+      lines.push('> 用户说出角色名时，按优先级查找 skill 文件：');
+      lines.push('> 1. `.prompts-mcp/skills/<name>.md`（生成目录）');
+      lines.push('> 2. `.github/prompts/skills/<name>.md`（项目目录）');
+      lines.push('> 3. `~/.pmcp/skills/custom/<name>.md`（全局自定义）');
+      lines.push('> 4. `~/.pmcp/skills/core/<name>.md`（全局核心）');
+      lines.push('> 每个阶段完成后自动进入下一阶段，无需用户手动触发。');
+    } else {
+      // 传统流程：手动选 skill
+      lines.push('## ⚡ 选择你的角色');
+      lines.push('');
+      lines.push('在通过 Hard Gate 预检后，**必须**先询问用户想以哪个角色开发。');
+      lines.push('');
+      lines.push('**角色加载协议：用户说出角色名时，Read 对应文件：**');
+      lines.push('');
+      for (const s of skillList) {
+        lines.push(`- **${s.name}** — ${s.desc}`);
+      }
+      lines.push('');
+      lines.push('> 用户只需说角色名（如"用 analyst 角色"），按优先级查找：');
+      lines.push('> 1. `.prompts-mcp/skills/<name>.md` → 2. `.github/prompts/skills/<name>.md` → 3. `~/.pmcp/skills/custom/<name>.md` → 4. `~/.pmcp/skills/core/<name>.md`');
+      lines.push('> 找到后 Read 并按其身份行事。');
+    }
     lines.push('');
     lines.push('---');
     lines.push('');

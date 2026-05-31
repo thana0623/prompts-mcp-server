@@ -58,6 +58,9 @@ function getSkillDirectories(): string[] {
  * 列出所有 skill（仅元数据，不含全文）
  * 从多个目录加载，按优先级去重
  */
+// ecc-workflow 是工作流模式（检测到 ECC 时自动进入），不是可选角色
+const EXCLUDED_SKILLS = new Set(['ecc-workflow']);
+
 export function listSkills(): Skill[] {
   const allSkills = new Map<string, Skill>();
 
@@ -66,6 +69,7 @@ export function listSkills(): Skill[] {
     const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
     for (const f of files) {
       const name = path.basename(f, '.md');
+      if (EXCLUDED_SKILLS.has(name)) continue;
       if (!allSkills.has(name)) {
         const filePath = path.join(dir, f);
         const raw = fs.readFileSync(filePath, 'utf-8');
