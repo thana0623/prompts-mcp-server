@@ -155,6 +155,25 @@ if [ -f "$STATE_FILE" ] && [ -f "$SPEC_FILE" ]; then
   fi
 fi
 
+# Step 0.5: Stage-aware lifecycle guidance
+if [ -f "$STATE_FILE" ]; then
+  STAGE=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync('$STATE_FILE','utf8')).stage||'')}catch(e){console.log('')}")
+  if [ "$STAGE" = "completed" ]; then
+    echo ""
+    echo "## 📋 上一个需求已完成"
+    echo ""
+    echo "开发阶段已结束。请检查 focus-spec.md 中的 TODO 是否全部完成。"
+    echo "完成后输入「归档」以归档当前需求，然后可以开始新需求。"
+    echo ""
+  elif [ "$STAGE" = "archived" ]; then
+    echo ""
+    echo "## ✅ 已归档"
+    echo ""
+    echo "上一个需求已归档完成。可以开始新需求。"
+    echo ""
+  fi
+fi
+
 # Step 1: Process any unprocessed logs from previous sessions
 # This ensures recent-5.md and summary-10.md are up-to-date even if
 # the previous session's SessionEnd hook didn't run (crash, force quit, etc.)

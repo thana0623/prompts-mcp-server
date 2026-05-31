@@ -72,6 +72,18 @@
 
 ## 单条处理流程（每次对话）
 
+### Step 0：需求切换检测
+
+每次收到新请求时，先检查 `.github/prompts/task-state.json` 的 stage：
+
+- **stage=completed** → 提示用户：「上一个需求开发已完成，请完成 focus-spec.md 中的 TODO 并归档。」停止处理新请求。
+- **stage=confirmed** → 检测是否包含需求切换关键词（「新需求」「新模块」「下一个」等）：
+  - 是 → 提示：「当前需求进行中，是否需求变更？」等待用户确认。
+  - 否 → 继续处理当前需求。
+- **stage=archived** → 检测到新需求关键词时，直接进入 Hard Gate 预检流程。
+- **stage=spec-pending** → 继续当前预检流程。
+- **stage=change-requested** → 继续需求变更流程。
+
 ### Step 1：清洗
 - 删除语气词、寒暄、开场白。
 - 仅保留需求事实、约束、验收条件。

@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .prompts-mcp/adapters/claude-code/capture-prompt.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit",
@@ -30,21 +41,6 @@
           {
             "type": "command",
             "command": "bash .prompts-mcp/hooks/post-write-scan.sh",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash .prompts-mcp/adapters/claude-code/normalize-log.sh",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "bash .prompts-mcp/hooks/process-logs.sh",
             "timeout": 10
           }
         ]

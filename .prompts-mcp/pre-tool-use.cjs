@@ -5,7 +5,9 @@
  * Stage-based write control:
  *   spec-pending      → only focus-spec.md and task-state.json writable
  *   confirmed          → focus-spec.md BLOCKED; other files hash-verified + scope-checked
- *   change-requested   → focus-spec.md writable again; other files allowed
+ *   change-requested   → all project files writable (requirement change in progress)
+ *   completed          → all writes BLOCKED (dev done, complete TODOs then archive)
+ *   archived           → all writes ALLOWED (contract done, ready for new requirement)
  *
  * Hash integrity:
  *   On every write during stage=confirmed, recompute focus-spec SHA256
@@ -114,6 +116,24 @@ process.stdin.on('end', () => {
       }
 
       // Hash OK → fall through to IN scope check
+    }
+
+    // Phase 4.5: completed stage — 开发完成，禁写引导完成 TODO
+    if (stage === 'completed') {
+      process.stderr.write(`BLOCKED: 需求已完成（stage=completed），开发写入已禁用。\n`);
+      process.stderr.write(`请完成 focus-spec.md 中剩余的 TODO 事项，然后归档。\n`);
+      process.stderr.write(`归档后可开始新需求。\n`);
+      process.exit(2);
+    }
+
+    // Phase 4.6: change-requested — 允许项目内文件写入
+    if (stage === 'change-requested') {
+      process.exit(0);
+    }
+
+    // Phase 4.7: archived stage — 全部完成，放行（引导新需求）
+    if (stage === 'archived') {
+      process.exit(0);
     }
 
     // Phase 5: IN scope check (existing logic)
