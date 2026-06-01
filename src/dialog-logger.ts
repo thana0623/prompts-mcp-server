@@ -3,11 +3,12 @@
  *
  * 对话日志记录模块。
  * 管理 daily / recent-5 / summary-10 / log-state / todos 的写入。
- * 从 index.ts MCP Server 类中抽取，供 MCP Server 和 CLI 共用。
+ * 统一使用中文 ## 对话-NNN 格式。
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { LogState } from './prompts-loader.js';
 
 // ─── Entry ID ───────────────────────────────────────────────────────
 
@@ -32,17 +33,20 @@ export function appendDailyLog(
   if (!fs.existsSync(dailyDir)) fs.mkdirSync(dailyDir, { recursive: true });
 
   const dailyPath = path.join(dailyDir, `${today}.md`);
+  const padId = String(entryId).padStart(3, '0');
+  const changesDesc = changes.length > 0
+    ? changes.map(c => `  - ${c}`).join('\n')
+    : '  - (无)';
   const entry = [
     '',
-    `## Entry-${String(entryId).padStart(3, '0')}`,
-    `- 时间: ${new Date().toISOString()}`,
-    `- 标题: ${title}`,
-    `- 清洗后需求: ${request}`,
-    changes.length > 0 ? `- 代码变更: ${changes.join(', ')}` : '',
-    decisions.length > 0 ? `- 技术决策: ${decisions.join('; ')}` : '',
-    todos.length > 0 ? `- 待办: ${todos.join('; ')}` : '',
+    `## 对话-${padId}`,
     '',
-  ].filter(Boolean).join('\n');
+    `- **时间**: ${new Date().toISOString().replace('T', ' ').replace('Z', '').replace(/\.\d+/, '')}`,
+    `- **用户问题**: ${request}`,
+    `- **本轮改动**:\n${changesDesc}`,
+    `- **结果**: ${changes.length > 0 ? `完成（${changes.length} 个文件修改）` : '对话（无代码修改）'}`,
+    '',
+  ].join('\n');
 
   fs.appendFileSync(dailyPath, entry, 'utf-8');
 }
@@ -51,16 +55,19 @@ export function appendDailyLog(
 
 export function updateRecent5(
   promptsDir: string, entryId: number, today: string,
-  _title: string, request: string, changes: string[], decisions: string[], todos: string[]
+  _title: string, request: string, changes: string[], decisions: string[], _todos: string[]
 ): void {
   const recentPath = path.join(promptsDir, 'recent-5.md');
+  const padId = String(entryId).padStart(3, '0');
+  const changesDesc = changes.length > 0
+    ? changes.map(c => `  - ${c}`).join('\n')
+    : '  - (无)';
   const newEntry = [
-    `## Entry-${String(entryId).padStart(3, '0')}`,
-    `- 日期: ${today}`,
-    `- 清洗后需求: ${request}`,
-    changes.length > 0 ? `- 代码变更:\n${changes.map(c => `  - ${c}`).join('\n')}` : '- 代码变更: (无)',
-    decisions.length > 0 ? `- 技术决策:\n${decisions.map(d => `  - ${d}`).join('\n')}` : '- 技术决策: (无)',
-    todos.length > 0 ? `- 待办:\n${todos.map(t => `  - ${t}`).join('\n')}` : '- 待办: (无)',
+    `## 对话-${padId}`,
+    `- **时间**: ${today}`,
+    `- **用户问题**: ${request}`,
+    `- **本轮改动**:\n${changesDesc}`,
+    `- **结果**: ${changes.length > 0 ? `完成（${changes.length} 个文件修改）` : '对话（无代码修改）'}`,
     '',
   ].join('\n');
 
@@ -69,10 +76,11 @@ export function updateRecent5(
     content = fs.readFileSync(recentPath, 'utf-8');
   }
 
-  const headerMatch = content.match(/^.*?(?=\n## Entry-)/s);
-  const header = headerMatch ? headerMatch[0].trim() : `# 最近 5 条对话与操作（动态窗口）\n\n> 规则：每次新增 1 条，超过 5 条时删除最旧 1 条，仅保留最近 5 条。\n`;
+  const headerMatch = content.match(/^.*?(?=\n## (?:对话|Dialog|Event)-)/s);
+  const header = headerMatch ? headerMatch[0].trim() : `# 最近对话记录（自动维护）\n\n> 由 session-end hook 自动生成，勿手动编辑。\n> 保留最近 5 条对话。\n`;
 
-  const entries = content.split(/\n(?=## Entry-)/).filter(e => e.startsWith('## Entry-'));
+  // 兼容旧格式
+  const entries = content.split(/\n(?=## (?:对话|Dialog|Event)-)/).filter(e => e.startsWith('## 对话-') || e.startsWith('## Dialog-') || e.startsWith('## Event-'));
   entries.push(newEntry);
 
   const recentEntries = entries.slice(-5);
@@ -85,7 +93,7 @@ export function updateRecent5(
 
 export function updateSummary10(
   promptsDir: string, entryId: number, today: string,
-  request: string, changes: string[], decisions: string[], todos: string[]
+  request: string, changes: string[], _decisions: string[], _todos: string[]
 ): void {
   const summaryPath = path.join(promptsDir, 'summary-10.md');
   let content = '';
@@ -94,83 +102,33 @@ export function updateSummary10(
   }
 
   if (!content) {
-    content = `# 近 10 条对话状态摘要（Stateful）\n\n## 窗口元数据\n- window_id: W-0001\n- 统计范围: Entry-001 ~ Entry-010\n- 当前已收录: 0 / 10\n\n## Stateful 摘要\n### Current State\n- 项目初始化完成。\n\n### Decisions Kept\n- (暂无)\n\n### Invalidated Decisions\n- (暂无)\n\n### Open TODO\n- (暂无)\n\n### Carry Forward\n- (暂无)\n`;
+    content = `# 对话摘要（有状态窗口）\n\n> 自动维护的滚动窗口。每 10 次对话生成一次压缩摘要。\n\n## W-0001\n\n- 窗口进度: 0/10\n`;
   }
 
-  const countMatch = content.match(/当前已收录:\s*(\d+)\s*\/\s*10/);
+  // 更新窗口进度
+  const progressRe = /窗口进度:\s*(\d+)\s*\/\s*10/;
+  const countMatch = content.match(progressRe);
   let count = countMatch ? parseInt(countMatch[1]) : 0;
   count = Math.min(count + 1, 10);
-
-  content = content.replace(/当前已收录:\s*\d+\s*\/\s*10/, `当前已收录: ${count} / 10`);
-
-  const stateSection = content.match(/### Current State\n([\s\S]*?)(?=\n### Decisions Kept)/);
-  if (stateSection) {
-    const newState = `### Current State\n- Entry-${String(entryId).padStart(3, '0')} (${today}): ${request}\n- Window progress: ${count}/10`;
-    content = content.replace(/### Current State\n[\s\S]*?(?=\n### Decisions Kept)/, newState + '\n');
-  }
-
-  if (decisions.length > 0) {
-    const keptSection = content.match(/### Decisions Kept\n([\s\S]*?)(?=\n### Invalidated Decisions)/);
-    if (keptSection) {
-      const newDecisions = decisions.map(d => `- ${d}`).join('\n');
-      const existingDecisions = keptSection[1].trim();
-      if (existingDecisions === '(暂无)') {
-        content = content.replace(/### Decisions Kept\n\(暂无\)/, `### Decisions Kept\n${newDecisions}`);
-      } else {
-        content = content.replace(/### Decisions Kept\n[\s\S]*?(?=\n### Invalidated Decisions)/,
-          `### Decisions Kept\n${existingDecisions}\n${newDecisions}\n`);
-      }
-    }
-  }
-
-  if (todos.length > 0) {
-    const todoSection = content.match(/### Open TODO\n([\s\S]*?)(?=\n### Carry Forward)/);
-    if (todoSection) {
-      const newTodos = todos.map(t => `- ${t}`).join('\n');
-      const existingTodos = todoSection[1].trim();
-      if (existingTodos === '(暂无)') {
-        content = content.replace(/### Open TODO\n\(暂无\)/, `### Open TODO\n${newTodos}`);
-      } else {
-        content = content.replace(/### Open TODO\n[\s\S]*?(?=\n### Carry Forward)/,
-          `### Open TODO\n${existingTodos}\n${newTodos}\n`);
-      }
-    }
-  }
+  content = content.replace(progressRe, `窗口进度: ${count}/10`);
 
   fs.writeFileSync(summaryPath, content, 'utf-8');
 }
 
 // ─── Log State ──────────────────────────────────────────────────────
 
-export interface LogState {
-  nextEntryId: number;
-  windowId: string;
-  windowStartEntry: number;
-  windowCount: number;
-  windowEntries: WindowEntry[];
-}
-
-export interface WindowEntry {
-  id: number;
-  date: string;
-  request: string;
-  changes: string[];
-  decisions: string[];
-  todos: string[];
-}
-
 export function updateLogState(
   promptsDir: string, entryId: number, today: string,
-  request: string, changes: string[], decisions: string[], todos: string[],
+  _request: string, _changes: string[], _decisions: string[], _todos: string[],
   clearWindow: boolean,
 ): void {
   const statePath = path.join(promptsDir, 'log-state.json');
   let state: LogState = {
     nextEntryId: 1,
     windowId: 'W-0001',
-    windowStartEntry: 1,
     windowCount: 0,
-    windowEntries: [],
+    lastProcessedDate: '',
+    lastProcessedCount: 0,
   };
 
   if (fs.existsSync(statePath)) {
@@ -179,27 +137,17 @@ export function updateLogState(
     } catch { /* use default */ }
   }
 
-  state.windowEntries.push({
-    id: entryId,
-    date: today,
-    request,
-    changes,
-    decisions,
-    todos,
-  });
-
-  state.windowCount = state.windowEntries.length;
+  state.windowCount++;
   state.nextEntryId = entryId + 1;
+  state.lastProcessedDate = today;
 
   if (clearWindow && state.windowCount >= 10) {
     const windowNum = parseInt(state.windowId.replace('W-', '')) || 1;
     state.windowId = `W-${String(windowNum + 1).padStart(4, '0')}`;
-    state.windowStartEntry = entryId + 1;
     state.windowCount = 0;
-    state.windowEntries = [];
   }
 
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
 }
 
 // ─── Todos ──────────────────────────────────────────────────────────

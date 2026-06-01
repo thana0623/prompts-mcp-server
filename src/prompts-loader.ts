@@ -37,18 +37,9 @@ function readJsonSafe<T>(filePath: string): T | null {
 export interface LogState {
   nextEntryId: number;
   windowId: string;
-  windowStartEntry: number;
   windowCount: number;
-  windowEntries: WindowEntry[];
-}
-
-export interface WindowEntry {
-  id: number;
-  date: string;
-  request: string;
-  changes: string[];
-  decisions: string[];
-  todos: string[];
+  lastProcessedDate: string;
+  lastProcessedCount: number;
 }
 
 export interface LoadedContext {
@@ -109,10 +100,6 @@ export function loadTodos(): LoadedContext {
   return { content: readFileSafe(filePath), path: filePath };
 }
 
-export function loadWorkflowLog(): LoadedContext {
-  const filePath = path.join(getPromptsDir(), 'workflow-log.md');
-  return { content: readFileSafe(filePath), path: filePath };
-}
 
 export function loadDevRules(): LoadedContext {
   const filePath = path.join(getPromptsDir(), 'dev-rules.md');

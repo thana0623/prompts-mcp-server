@@ -104,7 +104,7 @@ class PromptsMcpServer {
       tools: [
         {
           name: 'init_prompts',
-          description: '【初始化】扫描目标项目，自动生成原始 prompts 体系（context.md / workflow-log.md / recent-5.md / summary-10.md / todos.md / dev-rules.md / modules/）。已有文件不会覆盖。',
+          description: '【初始化】扫描目标项目，自动生成原始 prompts 体系（context.md / recent-5.md / summary-10.md / todos.md / dev-rules.md / modules/）。已有文件不会覆盖。',
           inputSchema: {
             type: 'object',
             properties: {

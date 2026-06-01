@@ -5,6 +5,26 @@
   "history": [
     {
       "stage": "archived",
+      "entered": "2026-06-01T12:45:00+08:00",
+      "note": "fix-dialog-logging-system 归档完成：管线A重接、对话总结中文化、格式统一、dead code 清理"
+    },
+    {
+      "stage": "confirmed",
+      "entered": "2026-06-01T12:30:00+08:00",
+      "note": "需求变更后重新签字：修正根目录文件保留策略，新增配置文件修改范围"
+    },
+    {
+      "stage": "change-requested",
+      "entered": "2026-06-01T12:20:00+08:00",
+      "note": "需求变更：根目录 hooks/ 和 adapters/ 是 npm 源文件不能删"
+    },
+    {
+      "stage": "confirmed",
+      "entered": "2026-06-01T12:00:00+08:00",
+      "note": "需求签字确认：fix-dialog-logging-system（对话日志系统重写）"
+    },
+    {
+      "stage": "archived",
       "entered": "2026-06-01T01:30:10.775Z",
       "note": "ecc-pmcp-integration 归档完成：角色统一 + 生命周期增强"
     },
@@ -17,11 +37,6 @@
       "stage": "spec-pending",
       "entered": "2026-06-01T01:17:41.009Z",
       "note": "契约完整性校验失败：focus-spec.md 被篡改，hash 不匹配"
-    },
-    {
-      "stage": "confirmed",
-      "entered": "2026-06-01T12:00:00+08:00",
-      "note": "需求签字确认：ecc-pmcp-integration（统一角色系统 + 学习功能接入）"
     },
     {
       "stage": "confirmed",
