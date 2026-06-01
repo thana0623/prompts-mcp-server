@@ -365,21 +365,21 @@ async function main(): Promise<void> {
       const bootstrapResult = bootstrap();
       console.log(formatBootstrap(bootstrapResult));
 
-      // ── Step 4: 角色选择提示（终端摘要） ──
-      const skills = listSkills({ hasEcc: bootstrapResult.hasEcc });
-      const maxNameLen = Math.max(...skills.map(s => s.meta.name.length));
-
+      // ── Step 4: 角色选择 / ECC 自动进入需求 ──
       if (bootstrapResult.hasEcc) {
-        console.log('\n[4/4] ECC 工作流\n');
+        // ECC 模式：跳过角色选择，自动加载 analyst 进入需求阶段
+        console.log('\n[4/4] ECC 已检测 → 自动进入需求阶段\n');
         console.log('═══════════════════════════════════════════════════════════');
-        console.log('  ECC 已检测 → 直接进入需求阶段');
+        console.log('  已自动加载 analyst 角色');
+        console.log('  请描述你的需求，我来生成 focus-spec.md 契约文档。');
         console.log('═══════════════════════════════════════════════════════════');
         console.log('');
         console.log('  流程: 需求确认 → /plan → /tdd → /code-review → /security-scan → 提交');
         console.log('');
-        console.log('  请描述你的需求，我来生成 focus-spec.md 契约文档。');
-        console.log('');
       } else {
+        // 独立模式：展示角色选择
+        const skills = listSkills();
+        const maxNameLen = Math.max(...skills.map(s => s.meta.name.length));
         console.log('\n[4/4] Skill 选择\n');
         console.log('═══════════════════════════════════════════════════════════');
         console.log('  请选择角色（说出角色名即可）：');

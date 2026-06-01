@@ -61,15 +61,33 @@ function getSkillDirectories(): string[] {
 // ecc-workflow 是工作流模式（检测到 ECC 时自动进入），不是可选角色
 const EXCLUDED_SKILLS = new Set(['ecc-workflow']);
 
-export function listSkills(): Skill[] {
+// ECC 模式下排除的 skills — 这些角色由 ECC agents 接管
+const ECC_OVERLAPPING_SKILLS = new Set(['architect', 'backend-java', 'review', 'database-handler']);
+
+export interface ListSkillsOptions {
+  hasEcc?: boolean;
+}
+
+/**
+ * 列出所有 skill（仅元数据，不含全文）
+ * 从多个目录加载，按优先级去重
+ * @param options.hasEcc - ECC 模式下排除与 ECC agents 重叠的 skills
+ */
+export function listSkills(options?: ListSkillsOptions): Skill[] {
   const allSkills = new Map<string, Skill>();
+  const excludeSet = new Set(EXCLUDED_SKILLS);
+  if (options?.hasEcc) {
+    for (const name of ECC_OVERLAPPING_SKILLS) {
+      excludeSet.add(name);
+    }
+  }
 
   for (const dir of getSkillDirectories()) {
     if (!fs.existsSync(dir)) continue;
     const files = fs.readdirSync(dir).filter(f => f.endsWith('.md'));
     for (const f of files) {
       const name = path.basename(f, '.md');
-      if (EXCLUDED_SKILLS.has(name)) continue;
+      if (excludeSet.has(name)) continue;
       if (!allSkills.has(name)) {
         const filePath = path.join(dir, f);
         const raw = fs.readFileSync(filePath, 'utf-8');
@@ -302,8 +320,8 @@ export function addSkill(
 /**
  * 列出所有 skill 的简要信息（用于 auto_start 展示）
  */
-export function formatSkillList(): string {
-  const skills = listSkills();
+export function formatSkillList(options?: ListSkillsOptions): string {
+  const skills = listSkills(options);
   if (skills.length === 0) return '';
 
   const lines: string[] = [];

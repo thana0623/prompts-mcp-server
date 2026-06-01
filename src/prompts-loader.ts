@@ -374,10 +374,10 @@ export function formatBootstrap(result: BootstrapResult): string {
     }
 
     if (result.hasEcc) {
-      // ECC 工作流：跳过角色选择，直接进入需求
-      lines.push('## ⚡ ECC 工作流');
+      // ECC 模式：跳过角色选择，自动加载 analyst 进入需求阶段
+      lines.push('## ⚡ ECC 已检测 → 自动进入需求阶段');
       lines.push('');
-      lines.push('ECC 已检测 → 直接进入需求阶段，无需选择角色。');
+      lines.push('已自动加载 **analyst** 角色，无需选择。');
       lines.push('');
       lines.push('**完整生命周期：**');
       lines.push('');

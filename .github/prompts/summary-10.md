@@ -5,7 +5,7 @@
 
 ## W-0001
 
-- Window progress: 9/10
+- Window progress: 10/10
 
 
 ### Carry Forward
@@ -255,5 +255,18 @@ Carry-forward from W-0018:
 ---
 
 ## W-0019
+
+- Window progress: 0/10
+
+
+### Carry Forward
+
+Carry-forward from W-0019:
+- Dialogs: 10 sessions
+- Key topics: 对话（无文件修改）; 对话（无文件修改）
+
+---
+
+## W-0020
 
 - Window progress: 0/10
