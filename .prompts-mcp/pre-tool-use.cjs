@@ -4,10 +4,15 @@
  *
  * Stage-based write control:
  *   spec-pending      → only focus-spec.md and task-state.json writable
- *   confirmed          → focus-spec.md BLOCKED; other files hash-verified + scope-checked
- *   change-requested   → all project files writable (requirement change in progress)
- *   completed          → all writes BLOCKED (dev done, complete TODOs then archive)
- *   archived           → all writes ALLOWED (contract done, ready for new requirement)
+ *   confirmed         → focus-spec.md BLOCKED; other files hash-verified + scope-checked
+ *   task-planning     → focus-spec.md writable (add task breakdown); IN scope writable
+ *   developing        → IN scope writable (ECC agent development)
+ *   reviewing         → all writes BLOCKED (review is read-only)
+ *   user-confirming   → only task-state.json writable (user decision)
+ *   change-requested  → all project files writable (requirement change in progress)
+ *   completed         → all writes BLOCKED (dev done, complete TODOs then archive)
+ *   incomplete        → same as developing (resume interrupted work)
+ *   archived          → all writes ALLOWED (contract done, ready for new requirement)
  *
  * Hash integrity:
  *   On every write during stage=confirmed, recompute focus-spec SHA256
@@ -77,8 +82,28 @@ process.stdin.on('end', () => {
       process.exit(2);
     }
 
-    if (stage === 'confirmed') {
-      // Hash integrity check
+    // task-planning: focus-spec writable (add task breakdown), IN scope writable
+    if (stage === 'task-planning') {
+      // Allow focus-spec writes during task planning
+      if (normalizedFile.endsWith('/focus-spec.md') || normalizedFile === 'focus-spec.md') {
+        process.exit(0);
+      }
+      // Fall through to IN scope check below
+    } else if (stage === 'developing' || stage === 'incomplete') {
+      // developing/incomplete: IN scope writable, skip hash check
+      // Fall through to IN scope check below
+    } else if (stage === 'reviewing') {
+      // reviewing: all writes BLOCKED (review is read-only)
+      process.stderr.write(`BLOCKED: stage=reviewing, tool=${tool}, file=${normalizedFile}\n`);
+      process.stderr.write('审查阶段禁止写入。请完成审查后进入用户确认阶段。\n');
+      process.exit(2);
+    } else if (stage === 'user-confirming') {
+      // user-confirming: only task-state.json writable
+      process.stderr.write(`BLOCKED: stage=user-confirming, tool=${tool}, file=${normalizedFile}\n`);
+      process.stderr.write('用户确认阶段禁止写入业务文件。只允许更新 task-state.json。\n');
+      process.exit(2);
+    } else if (stage === 'confirmed') {
+      // confirmed: hash integrity check, then fall through to IN scope check
       let specContent = '';
       try {
         specContent = fs.readFileSync(specPath, 'utf8');
@@ -89,12 +114,10 @@ process.stdin.on('end', () => {
 
       const actualHash = crypto.createHash('sha256').update(specContent).digest('hex');
       if (!storedHash) {
-        // Fail-closed: confirmed but no hash stored → require re-confirmation
         process.stderr.write(`BLOCKED: stage=confirmed 但 contractHash 缺失，请重新确认需求。\n`);
         process.exit(2);
       }
       if (actualHash !== storedHash) {
-        // Contract tampered — force stage back to spec-pending
         try {
           const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
           state.stage = 'spec-pending';
@@ -114,7 +137,6 @@ process.stdin.on('end', () => {
         process.stderr.write(`stage 已回退到 spec-pending，请重新确认需求。\n`);
         process.exit(2);
       }
-
       // Hash OK → fall through to IN scope check
     }
 

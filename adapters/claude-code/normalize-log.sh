@@ -21,15 +21,34 @@ input=$(cat)
 # Normalize and pipe to shared hook
 export CLAUDE_INPUT="$input"
 normalized=$(node -e "
+const fs = require('fs');
+const path = require('path');
 const data = JSON.parse(process.env.CLAUDE_INPUT);
 const tool = data.tool_name || 'unknown';
 const ti = data.tool_input || {};
 const session = data.session_id || 'unknown';
 
-// Skip read-only tools
-const skip = ['Read','Glob','Grep','Agent','WebFetch','WebSearch',
+// Skip read-only tools (completely silent)
+const skip = ['Read','Glob','Grep','WebFetch','WebSearch',
               'TaskList','TaskGet','TaskOutput','Skill'];
 if (skip.includes(tool)) process.exit(0);
+
+// Lightweight logging for Agent calls (separate file, not main JSONL)
+const lightLog = ['Agent'];
+if (lightLog.includes(tool)) {
+  const DIALOGS_DIR = path.join(process.env.PROJECT_DIR, 'logs', 'dialogs');
+  fs.mkdirSync(DIALOGS_DIR, { recursive: true });
+  const today = new Date().toISOString().slice(0, 10);
+  const readsFile = path.join(DIALOGS_DIR, today + '.reads.jsonl');
+  const entry = {
+    tool,
+    session,
+    time: new Date().toISOString(),
+    target: (ti.agent_type || '') + (ti.label ? ':' + ti.label : '')
+  };
+  fs.appendFileSync(readsFile, JSON.stringify(entry) + '\n');
+  process.exit(0);
+}
 
 let target = '';
 let summary = 'Tool call: ' + tool;

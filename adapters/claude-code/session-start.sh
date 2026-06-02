@@ -182,6 +182,33 @@ if [ -f "$HOOKS_DIR/process-logs.sh" ]; then
   bash "$HOOKS_DIR/process-logs.sh" 2>/dev/null || true
 fi
 
+# Step 1.5: Refresh context.md with current project state
+# Re-scans project structure, languages, frameworks, package manager
+# Only updates section 1 (tech stack), preserves section 2+ (user-edited)
+node "$MCP_CLI_PATH" refresh-context 2>/dev/null || true
+
+# Step 1.6: Auto-transition archived → spec-pending for new requirement cycles
+# When stage=archived and no focus-spec exists, reset to spec-pending to trigger Hard Gate
+# Note: STATE_FILE already defined in Step 0 (contract integrity check)
+if [ -f "$STATE_FILE" ]; then
+  STAGE=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).stage||'')}catch{console.log('')}" "$STATE_FILE" 2>/dev/null)
+  SPEC_EXISTS="no"
+  if [ -f "$SPEC_FILE" ]; then SPEC_EXISTS="yes"; fi
+
+  if [ "$STAGE" = "archived" ] && [ "$SPEC_EXISTS" = "no" ]; then
+    node -e "
+      const fs=require('fs'),p=process.argv[1];
+      const s=JSON.parse(fs.readFileSync(p,'utf8'));
+      s.stage='spec-pending';
+      s.taskId='';
+      s.contractHash='';
+      s.history=s.history||[];
+      s.history.unshift({stage:'spec-pending',entered:new Date().toISOString(),note:'session-start 自动重置：上一需求已归档，准备新需求'});
+      fs.writeFileSync(p,JSON.stringify(s,null,2)+'\n');
+    " "$STATE_FILE" 2>/dev/null || true
+  fi
+fi
+
 # Run bootstrap to load all context
 BOOTSTRAP_OUTPUT=$(cd "$PROJECT_DIR" && node "$MCP_CLI_PATH" bootstrap 2>&1)
 

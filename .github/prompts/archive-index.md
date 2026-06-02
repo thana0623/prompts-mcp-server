@@ -10,3 +10,4 @@
 | 3 | 2026-05-28 | enforce-contract-immutability | ✅ 合并完成 |
 | 4 | 2026-05-31 | fix-pmcp-start-skill-system | ✅ 7个问题修复 |
 | 5 | 2026-06-01 | ecc-pmcp-integration | ✅ 角色统一+生命周期增强 |
+| 6 | 2026-06-02 | simplify-startup-and-fix-ecc | ✅ ECC检测修复+启动流程精简(308→50行) |

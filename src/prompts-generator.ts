@@ -2,7 +2,7 @@
  * prompts-generator.ts
  * 
  * 自动生成项目 prompts 体系。
- * 扫描目标项目结构，生成 context.md / workflow-log.md / recent-5.md / summary-10.md / todos.md / modules/ 等。
+ * 扫描目标项目结构，生成 context.md / recent-5.md / summary-10.md / todos.md / modules/ 等。
  * 同时生成开发规范 prompt（前后端、环境配置等），用户可外部补充。
  */
 
@@ -250,6 +250,7 @@ function detectPackageManager(files: string[]): string {
   if (names.has('pnpm-lock.yaml')) return 'pnpm';
   if (names.has('yarn.lock')) return 'yarn';
   if (names.has('package-lock.json')) return 'npm';
+  if (names.has('package.json')) return 'npm';  // 回退：有 package.json 但无 lockfile
   if (names.has('pom.xml')) return 'Maven';
   if (names.has('build.gradle')) return 'Gradle';
   return 'Unknown';
@@ -329,137 +330,97 @@ ${info.hasBackend ? `
 
 - 最近 5 条动态窗口: ${config.promptsSubDir}/recent-5.md
 - 近 10 条 Stateful 摘要: ${config.promptsSubDir}/summary-10.md
-- 工作流规范: ${config.promptsSubDir}/workflow-log.md
 - 模块记录: ${config.promptsSubDir}/modules/
 - 待办事项: ${config.promptsSubDir}/todos.md
 `;
 }
 
 /**
- * 生成 workflow-log.md
+ * 生成 context.md 的 section 1（技术栈部分）
+ * 供 refreshContextMd() 复用
  */
-export function generateWorkflowLogMd(): string {
-  return `# 递进式 AI 对话日志工作流
+export function generateSection1(info: ProjectInfo): string {
+  return `# 项目上下文总览（Context）
 
-## 目标
-- 保留最近 5 条对话与操作（动态窗口）。
-- 每累计近 10 条，产出一次 Stateful Markdown 摘要。
-- 每条对话统一执行：清洗 -> 提取 -> 归档/压缩。
+> 用途：统一沉淀项目当前技术栈、历史决策、待办事项，以及每日记录索引。
+> 自动生成时间: ${new Date().toISOString().slice(0, 10)}
 
-## 文件职责
-- \`${config.promptsSubDir}/daily/YYYY-MM-DD.md\`
-  - 保存当日全量原始记录（可读、可追溯）。
-- \`${config.promptsSubDir}/recent-5.md\`
-  - 保存最近 5 条清洗后的结构化记录。
-- \`${config.promptsSubDir}/summary-10.md\`
-  - 保存 10 条窗口的有状态摘要与窗口元信息。
-- \`${config.promptsSubDir}/context.md\`
-  - 仅保留索引、全局技术栈、关键决策与待办。
-- \`${config.promptsSubDir}/modules/<module-name>.md\`
-  - 按模块记录每一项修改（目录式）。
-- \`${config.promptsSubDir}/todos.md\`
-  - 待办事项列表。
+## 1. 当前技术栈
 
-## 执行纪律
+### 检测到的语言
+${info.languages.map(l => `- ${l}`).join('\n') || '- (未检测到)'}
 
-1. 每次处理新请求，先读取 \`${config.promptsSubDir}/context.md\`，确认当前全局状态。
-2. 再加载 \`${config.promptsSubDir}/daily/YYYY-MM-DD.md\`（当日）和 \`${config.promptsSubDir}/recent-5.md\`（最新 5 条），了解最新的对话和决策。
-3. 按任务类型加载最相关的 prompt 文件，避免只看局部上下文就直接动手。
-4. 如果需求表达模糊、缺少边界、缺少验收条件，**立刻停止**，先追问；一轮不够就继续追问。
-5. 在需求明确前，**禁止**直接设计实现方案，**禁止**写代码，**禁止**做假设。
-6. 只有在明确"要做什么、为什么做、做到什么程度"之后，才能进入设计与编码。
-7. 修改功能前，先读取对应模块的模块记录（\`${config.promptsSubDir}/modules/<module>.md\`）。
+### 检测到的框架
+${info.frameworks.map(f => `- ${f}`).join('\n') || '- (未检测到)'}
 
-## 需求澄清的硬约束
+### 构建工具
+${info.buildTools.map(t => `- ${t}`).join('\n') || '- (未检测到)'}
 
-**这是最重要的纪律，直接关乎项目质量。**
+### 数据库/中间件
+${info.databases.map(d => `- ${d}`).join('\n') || '- (未检测到)'}
 
-### 明确标准（5 项都要 ✓）
+### 包管理器
+- ${info.packageManager}
 
-- [ ] **目标明确**：能用一句话说清"这个需求要解决什么问题"
-- [ ] **输入输出明确**："从哪来"和"到哪去"都要清楚
-- [ ] **约束明确**：有没有"不能改的地方"
-- [ ] **验收标准明确**："什么时候算完成"要有具体标准
-- [ ] **影响范围明确**：要改哪些文件/模块、要更新哪些 docs
-
-### 停止标准（任何一项不符合就停止）
-
+### 项目结构
 \`\`\`
-❌ 用户提问模糊 → STOP，不要猜，立刻问
-❌ 需求有歧义 → STOP，不要假设，立刻澄清
-❌ 验收标准不清 → STOP，不要编，立刻确认
-❌ 一轮追问不够 → CONTINUE，继续追问到明确
-❌ 仍然模糊 → STOP，向用户说明无法继续，要求补充
+${info.name}/
+${info.topDirs.map(d => `├── ${d}/`).join('\n')}
 \`\`\`
-
-### 追问策略
-
-- 使用固定问题清单（见下文）
-- 一轮不够就继续
-- 每一轮都要确认"这一项是否明确了"
-- 直到所有 5 项都达到"明确"
-
-## 固定追问清单
-
-当需求不清晰时，优先按以下顺序追问：
-
-1. 你要解决的具体问题是什么？
-2. 期望输出是什么，成功标准是什么？
-3. 这次变更影响哪些文件、模块或页面？
-4. 是否有不能改动的约束、技术选型或业务边界？
-5. 是否需要补充设计稿、接口契约、数据结构或测试要求？
-
-如果用户回答仍然模糊，继续围绕缺失项追问，不要自己补全。
-
-## 单条处理流程（每次对话）
-
-### Step 1：清洗
-- 删除语气词、寒暄、开场白。
-- 仅保留需求事实、约束、验收条件。
-
-### Step 2：提取
-- 代码变更: 涉及文件与核心改动点。
-- 技术决策: 新增/变更/废弃的决策。
-- 待办事项: 未完成且可执行的下一步。
-
-### Step 3：入库
-- 先追加到 daily 当日文件。
-- 再写入 recent-5 作为最新一条 Entry。
-- 若 recent-5 超过 5 条，删除最旧一条，保持 5 条。
-- **立刻对新 Entry 更新 summary-10 的 Current State 和 Open TODO**（不用等到 10 条）
-
-### Step 4：压缩与整理
-- 当累计达到 10 条时：
-  - 生成 summary-10 的完整 Stateful 摘要（Current State / Decisions Kept / Invalidated Decisions / Open TODO / Carry Forward）。
-  - 重置下一窗口计数（例如 W-0002）。
-- 每次更新时都检查格式一致性，避免重复或遗漏。
-
-### Step 5：模块记录
-- 如果本次修改涉及特定模块，同步更新 \`${config.promptsSubDir}/modules/<module>.md\`
-- 记录内容：修改时间、变更内容、涉及文件、决策
-
-### Step 6：实时供给智能体
-- 智能体每次启动时，必须在第 1.5 步加载最新的 daily、recent-5、summary-10
-- 这样智能体能"知道"最新 5 条对话是什么，不会重复或遗忘决策
-
-## 结构化记录模板（recent-5）
-- 日期:
-- 清洗后需求:
-- 代码变更:
-- 技术决策:
-- 待办:
-
-## 清洗规则（简版）
-- 移除: "很高兴为你服务""我来帮你""好的收到"等寒暄语。
-- 合并重复指令，保留最强约束版本。
-- 句子改写为动作导向：动词 + 对象 + 约束。
-
-## 质量检查
-- 每条必须有 代码变更 / 技术决策 / 待办 三字段。
-- context 不写长过程，只写结论与索引。
-- 10 条摘要必须包含"可延续状态"（Carry Forward）。
-- 需求澄清未完成时，不要写入伪设计或猜测性结论。
 `;
+}
+
+/**
+ * 刷新 context.md：重新扫描项目，只更新 section 1（技术栈），保留 section 2+（用户编辑）
+ */
+export function refreshContextMd(projectRoot: string): { updated: boolean; changes: string[] } {
+  const info = scanProject(projectRoot);
+  const contextPath = path.join(getPromptsDir(), 'context.md');
+
+  if (!fs.existsSync(contextPath)) {
+    // 首次生成
+    fs.writeFileSync(contextPath, generateContextMd(info), 'utf-8');
+    return { updated: true, changes: ['generated'] };
+  }
+
+  const existing = fs.readFileSync(contextPath, 'utf-8');
+  const section2Index = existing.indexOf('\n## 2.');
+
+  if (section2Index === -1) {
+    // 无 section 2，全量重新生成
+    fs.writeFileSync(contextPath, generateContextMd(info), 'utf-8');
+    return { updated: true, changes: ['full-regen'] };
+  }
+
+  // 只替换 section 1，保留 section 2+
+  const userSections = existing.slice(section2Index);
+  const newSection1 = generateSection1(info);
+  const newContent = newSection1 + '\n' + userSections;
+
+  // 检测变化：比较技术栈关键字段
+  const changes: string[] = [];
+  const oldLangMatch = existing.match(/### 检测到的语言\n([\s\S]*?)(?=\n### )/);
+  const newLangMatch = newSection1.match(/### 检测到的语言\n([\s\S]*?)(?=\n### )/);
+  if (oldLangMatch?.[1]?.trim() !== newLangMatch?.[1]?.trim()) changes.push('languages');
+
+  const oldFwMatch = existing.match(/### 检测到的框架\n([\s\S]*?)(?=\n### )/);
+  const newFwMatch = newSection1.match(/### 检测到的框架\n([\s\S]*?)(?=\n### )/);
+  if (oldFwMatch?.[1]?.trim() !== newFwMatch?.[1]?.trim()) changes.push('frameworks');
+
+  const oldPmMatch = existing.match(/### 包管理器\n- (.+)/);
+  const newPmMatch = newSection1.match(/### 包管理器\n- (.+)/);
+  if (oldPmMatch?.[1]?.trim() !== newPmMatch?.[1]?.trim()) changes.push('packageManager');
+
+  const oldDirMatch = existing.match(/### 项目结构\n```[\s\S]*?```\n/);
+  const newDirMatch = newSection1.match(/### 项目结构\n```[\s\S]*?```\n/);
+  if (oldDirMatch?.[0] !== newDirMatch?.[0]) changes.push('structure');
+
+  if (changes.length === 0) {
+    return { updated: false, changes: [] };
+  }
+
+  fs.writeFileSync(contextPath, newContent, 'utf-8');
+  return { updated: true, changes };
 }
 
 /**
@@ -724,7 +685,6 @@ export function initPrompts(projectRoot: string): InitResult {
   // 生成文件
   const files: { name: string; content: string }[] = [
     { name: 'context.md', content: generateContextMd(info) },
-    { name: 'workflow-log.md', content: generateWorkflowLogMd() },
     { name: 'recent-5.md', content: generateRecent5Md() },
     { name: 'summary-10.md', content: generateSummary10Md() },
     { name: 'log-state.json', content: generateLogStateJson() },

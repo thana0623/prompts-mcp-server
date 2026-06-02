@@ -1,32 +1,41 @@
-# Recent Dialogs (auto-managed by hooks)
+# Recent Activity (auto-managed by hooks)
 
-> Auto-generated from session summaries. Do not edit manually.
-> Showing last 5 dialog sessions.
+> Auto-generated from tool-use hooks. Do not edit manually.
+> Showing last 5 state-changing events.
 
-## Dialog-560
+## Event-692
 
-- **Time**: 2026-05-31 16:51:07
-- **User**: > pmcp start
+- **Time**: 2026-06-02 08:19:11
+- **Tool**: `Bash`
+- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && mv .github/prompts/focus-spec.md .github/prompts/focus-spec-history/simplify-startup-and-fix-ecc.md`
+- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && mv .github/prompts/focus-spec.md .github/prompts/fo
 
-  Thought for 3s (ctrl+o to expand)
+## Event-693
 
-● Bash(npx pmcp start)
-  ⎿  ════════════════════════════════════════════════════════════
-       Prompts MCP - 一键启动
-     ═════════════════════════════
-- **Outcome**: 对话（无文件修改）
-- **Files**: (none)
-## Dialog-561
+- **Time**: 2026-06-02 08:19:51
+- **Tool**: `Bash`
+- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && cat .github/prompts/archive-index.md 2>/dev/null || echo "# 归档索引" > .github/prompts/archive-index.md`
+- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && cat .github/prompts/archive-index.md 2>/dev/null ||
 
-- **Time**: 2026-05-31 18:38:56
-- **User**: │ focus-spec 没  │ 原始契约只写了"模块拆分+受众分流"，但实际做了出勤制度、纪律、外部参与 │ 🟡  │
-  │ 有覆盖后续追加 │ 、休眠机制等大量追加内容，超出契约范围                                │ 中  │
-  ├────────────────┼─────────────────────────────────────────────
-- **Outcome**: 对话（无文件修改）
-- **Files**: (none)
-## Dialog-562
+## Event-694
 
-- **Time**: 2026-06-01 01:32:53
-- **User**: pmcp start
-- **Outcome**: 对话（无文件修改）
-- **Files**: (none)
+- **Time**: 2026-06-02 08:21:16
+- **Tool**: `Edit`
+- **Target**: `C:\admin\Code\Project\prompts-mcp-server\.github\prompts\archive-index.md`
+- **Summary**: Modified C:\admin\Code\Project\prompts-mcp-server\.github\prompts\archive-index.md
+
+## Event-695
+
+- **Time**: 2026-06-02 08:21:41
+- **Tool**: `Bash`
+- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && git add -A && git status`
+- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && git add -A && git status
+
+## Event-696
+
+- **Time**: 2026-06-02 08:22:04
+- **Tool**: `Bash`
+- **Target**: `cd "C:/admin/Code/Project/prompts-mcp-server" && git commit -m "feat: simplify startup + fix ECC detection
+
+- Fix ECC detection: add independent check in cli.ts, not relying on bootstrap() return valu`
+- **Summary**: Ran: cd "C:/admin/Code/Project/prompts-mcp-server" && git commit -m "feat: simplify startup + fix ECC det

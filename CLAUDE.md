@@ -33,3 +33,52 @@ The `adapters/claude-code/normalize-log.sh` hook normalizes Claude Code's tool c
 The `adapters/claude-code/session-end.sh` hook delegates to `hooks/session-end.sh` which:
 1. Runs `process-logs.sh` to update recent-5.md and summary-10.md
 2. Git commits all changes
+
+## ECC Integration
+
+PMCP can be combined with ECC (Everything Claude Code) for enterprise-grade workflows.
+
+### Quick Start
+
+```bash
+# 1. Start PMCP with context loading
+pmcp start
+
+# 2. Select the ecc-workflow skill
+#    This skill provides integrated ECC + PMCP workflows
+
+# 3. Use ECC commands directly
+/tdd              # Test-driven development
+/code-review      # Code quality review
+/security-scan    # Security scanning
+/plan             # Implementation planning
+```
+
+### Combined Workflow
+
+| Phase | PMCP | ECC |
+|-------|------|-----|
+| Init | `pmcp setup` | `/project-init` |
+| Start | `pmcp start` | - |
+| Plan | `pmcp check` + `pmcp plan` | `/plan` |
+| Develop | - | `/tdd` |
+| Review | - | `/code-review` + `/security-scan` |
+| Log | `pmcp module-log` | `/save-session` |
+| End | Auto (hook) | Auto (hook) |
+
+### Available ECC Skills
+
+- `/tdd` - Test-driven development
+- `/plan` - Implementation planning
+- `/code-review` - Quality review
+- `/security-scan` - Security scanning
+- `/build-fix` - Build error fixing
+- `/learn` - Session pattern extraction
+- `/skill-create` - Generate skills from git history
+
+### Automation Hooks
+
+Both PMCP and ECC provide hooks that run automatically:
+
+- **PMCP**: Session start/end, context loading, log processing
+- **ECC**: Quality gates, config protection, MCP health checks, continuous learning

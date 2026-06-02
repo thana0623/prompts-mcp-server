@@ -1,8 +1,73 @@
 {
-  "stage": "archived",
+  "stage": "spec-pending",
   "taskId": "",
   "contractHash": "",
   "history": [
+    {
+      "stage": "spec-pending",
+      "entered": "2026-06-02T08:23:11.185Z",
+      "note": "session-start 自动重置：上一需求已归档，准备新需求"
+    },
+    {
+      "stage": "archived",
+      "entered": "2026-06-02T15:45:00+08:00",
+      "note": "simplify-startup-and-fix-ecc 归档完成：ECC 检测修复、启动流程精简（308行→50行）"
+    },
+    {
+      "stage": "task-planning",
+      "entered": "2026-06-02T15:35:00+08:00",
+      "note": "架构确认后进入任务拆分阶段"
+    },
+    {
+      "stage": "confirmed",
+      "entered": "2026-06-02T15:30:00+08:00",
+      "note": "需求签字确认：simplify-startup-and-fix-ecc（简化启动流程 + 修复 ECC 检测）"
+    },
+    {
+      "stage": "archived",
+      "entered": "2026-06-01T10:04:12.416Z",
+      "note": "context-lifecycle-fix + ecc-integration 归档完成：双写消除、context.md 动态刷新、carry-forward 淘汰、Agent 轻量级日志、ECC 真正集成（4 层强制）"
+    },
+    {
+      "stage": "archived",
+      "entered": "2026-06-01T09:52:30.277Z",
+      "note": "pmcp advance-stage 手动转换: spec-pending → archived"
+    },
+    {
+      "stage": "spec-pending",
+      "entered": "2026-06-01T09:51:27.633Z",
+      "note": "pmcp advance-stage 手动转换: archived → spec-pending"
+    },
+    {
+      "stage": "archived",
+      "entered": "2026-06-01T09:43:29.556Z",
+      "note": "pmcp advance-stage 手动转换: spec-pending → archived"
+    },
+    {
+      "stage": "spec-pending",
+      "entered": "2026-06-01T09:42:54.081Z",
+      "note": "pmcp advance-stage 手动转换: archived → spec-pending"
+    },
+    {
+      "stage": "archived",
+      "entered": "2026-06-01T12:45:00+08:00",
+      "note": "fix-dialog-logging-system 归档完成：管线A重接、对话总结中文化、格式统一、dead code 清理"
+    },
+    {
+      "stage": "confirmed",
+      "entered": "2026-06-01T12:30:00+08:00",
+      "note": "需求变更后重新签字：修正根目录文件保留策略，新增配置文件修改范围"
+    },
+    {
+      "stage": "change-requested",
+      "entered": "2026-06-01T12:20:00+08:00",
+      "note": "需求变更：根目录 hooks/ 和 adapters/ 是 npm 源文件不能删"
+    },
+    {
+      "stage": "confirmed",
+      "entered": "2026-06-01T12:00:00+08:00",
+      "note": "需求签字确认：fix-dialog-logging-system（对话日志系统重写）"
+    },
     {
       "stage": "archived",
       "entered": "2026-06-01T01:30:10.775Z",
@@ -17,11 +82,6 @@
       "stage": "spec-pending",
       "entered": "2026-06-01T01:17:41.009Z",
       "note": "契约完整性校验失败：focus-spec.md 被篡改，hash 不匹配"
-    },
-    {
-      "stage": "confirmed",
-      "entered": "2026-06-01T12:00:00+08:00",
-      "note": "需求签字确认：ecc-pmcp-integration（统一角色系统 + 学习功能接入）"
     },
     {
       "stage": "confirmed",

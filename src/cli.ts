@@ -20,6 +20,7 @@
 import {
   bootstrap,
   formatBootstrap,
+  formatBootstrapCompact,
 } from './prompts-loader.js';
 import {
   getProjectRoot,
@@ -118,6 +119,8 @@ Commands:
   setup [--project-root <path>] [--assistant <name>]
        一键初始化：生成 prompts + hooks + MCP 配置 + Skills
   bootstrap                       加载上下文（已初始化项目使用）
+  refresh-context                 刷新 context.md 技术栈（保留用户编辑）
+  advance-stage [--to <stage>]    推进 lifecycle 阶段
   check <description>             需求澄清检查（5 项标准）
   plan <description>              生成可行计划（需求需已澄清）
   log --title <t> --request <r>   记录对话日志
@@ -266,24 +269,45 @@ async function main(): Promise<void> {
             try { existingSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')); } catch { /* ignore */ }
           }
 
-          const hookBase = '.prompts-mcp/adapters/claude-code';
+          const hookBase = '.prompts-mcp';
           const newSettings = {
             ...existingSettings,
             hooks: {
               ...(existingSettings.hooks || {}),
+              UserPromptSubmit: [{
+                hooks: [{
+                  type: 'command',
+                  command: `node ${hookBase}/capture-prompt.cjs`,
+                  timeout: 5
+                }]
+              }],
+              PreToolUse: [{
+                matcher: 'Write|Edit',
+                hooks: [{
+                  type: 'command',
+                  command: `node ${hookBase}/pre-tool-use.cjs`
+                }]
+              }],
               SessionStart: [{
                 matcher: '*',
                 hooks: [{
                   type: 'command',
-                  command: `bash ${hookBase}/session-start.sh`,
+                  command: `node ${hookBase}/session-start.cjs`,
                   statusMessage: 'Loading project context...'
                 }]
               }],
               PostToolUse: [{
+                matcher: 'Write|Edit',
+                hooks: [{
+                  type: 'command',
+                  command: `node ${hookBase}/post-write-scan.cjs`,
+                  timeout: 10
+                }]
+              }, {
                 matcher: '*',
                 hooks: [{
                   type: 'command',
-                  command: `bash ${hookBase}/normalize-log.sh`,
+                  command: `node ${hookBase}/normalize-log.cjs`,
                   timeout: 5
                 }]
               }],
@@ -291,7 +315,7 @@ async function main(): Promise<void> {
                 matcher: '*',
                 hooks: [{
                   type: 'command',
-                  command: `bash ${hookBase}/session-end.sh`,
+                  command: `node ${hookBase}/session-end.cjs`,
                   statusMessage: 'Finalizing session...',
                   timeout: 30
                 }]
@@ -306,18 +330,34 @@ async function main(): Promise<void> {
       } else {
         console.log('[1/4] 项目已初始化，跳过\n');
 
-        // 已有项目：更新 hook 脚本到最新版本
+        // 已有项目：基于版本号检查是否需要同步 hook 脚本
         const hooksSrc = path.join(PACKAGE_ROOT, 'hooks');
         const adapterSrc = path.join(PACKAGE_ROOT, 'adapters', assistant);
         const hooksDest = path.join(projectRoot, '.prompts-mcp', 'hooks');
         const adapterDest = path.join(projectRoot, '.prompts-mcp', 'adapters', assistant);
-        if (fs.existsSync(hooksSrc)) {
-          fs.cpSync(hooksSrc, hooksDest, { recursive: true });
+
+        const srcPkgPath = path.join(PACKAGE_ROOT, 'package.json');
+        const srcVersion = fs.existsSync(srcPkgPath)
+          ? JSON.parse(fs.readFileSync(srcPkgPath, 'utf-8')).version || '0'
+          : '0';
+        const destMarker = path.join(hooksDest, '.sync-version');
+        let shouldSync = true;
+        if (fs.existsSync(destMarker)) {
+          shouldSync = fs.readFileSync(destMarker, 'utf-8').trim() !== srcVersion;
         }
-        if (fs.existsSync(adapterSrc)) {
-          fs.cpSync(adapterSrc, adapterDest, { recursive: true });
+
+        if (shouldSync) {
+          if (fs.existsSync(hooksSrc)) {
+            fs.cpSync(hooksSrc, hooksDest, { recursive: true });
+          }
+          if (fs.existsSync(adapterSrc)) {
+            fs.cpSync(adapterSrc, adapterDest, { recursive: true });
+          }
+          fs.writeFileSync(destMarker, srcVersion, 'utf-8');
+          console.log('    = Hook 脚本已同步到最新版本');
+        } else {
+          console.log('    = Hook 脚本已是最新版本');
         }
-        console.log('    = Hook 脚本已更新到最新版本');
 
         // 同步新增 skill 文件到项目
         const skillsSrc = path.join(PACKAGE_ROOT, '.github', 'prompts', 'skills');
@@ -360,26 +400,49 @@ async function main(): Promise<void> {
         }
       }
 
-      // ── Step 3: 加载上下文 ──
+      // ── Step 3: 加载上下文（精简输出） ──
       console.log('\n[3/4] 加载上下文...\n');
       const bootstrapResult = bootstrap();
-      console.log(formatBootstrap(bootstrapResult));
+      console.log(formatBootstrapCompact(bootstrapResult));
 
-      // ── Step 4: 角色选择提示（终端摘要） ──
-      const skills = listSkills({ hasEcc: bootstrapResult.hasEcc });
-      const maxNameLen = Math.max(...skills.map(s => s.meta.name.length));
+      // ── Step 3.5: ECC 检测（独立于 bootstrap，避免 hasEcc 返回 false） ──
+      const homeDir = process.env.HOME || process.env.USERPROFILE || '~';
+      const hasEcc = fs.existsSync(path.join(homeDir, '.claude', 'rules', 'ecc'));
 
-      if (bootstrapResult.hasEcc) {
-        console.log('\n[4/4] ECC 工作流\n');
+      // ── Step 4: 角色选择 / ECC 自动进入需求 ──
+      if (hasEcc) {
+        // ECC 模式：跳过角色选择，自动加载 analyst 进入需求阶段
+        console.log('\n[4/4] ECC 已检测 → 自动进入需求阶段\n');
         console.log('═══════════════════════════════════════════════════════════');
-        console.log('  ECC 已检测 → 直接进入需求阶段');
-        console.log('═══════════════════════════════════════════════════════════');
-        console.log('');
-        console.log('  流程: 需求确认 → /plan → /tdd → /code-review → /security-scan → 提交');
-        console.log('');
+        console.log('  已自动加载 analyst 角色');
         console.log('  请描述你的需求，我来生成 focus-spec.md 契约文档。');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('');
+
+        // 展示当前阶段引导
+        const stage = bootstrapResult.taskState?.stage || 'spec-pending';
+        const stageGuide: Record<string, { label: string; next: string }> = {
+          'spec-pending': { label: '⏳ 需求待签字', next: '请描述需求 → analyst 生成 focus-spec → 签字' },
+          'confirmed': { label: '✅ 需求已签字', next: '输入「拆任务」进入任务拆分阶段' },
+          'task-planning': { label: '📋 任务拆分中', next: 'PMCP 引导拆分子任务 → 确认后选择 ECC agent 开发' },
+          'developing': { label: '🔨 开发中', next: 'ECC agent 执行开发 → 完成后输入 /code-review' },
+          'reviewing': { label: '🔍 审查中', next: 'code-reviewer + security-reviewer 检查 → 通过后等待确认' },
+          'user-confirming': { label: '👤 等待用户确认', next: '输入「通过」确认，或描述问题回到开发' },
+          'completed': { label: '🎉 开发完成', next: 'git commit + /learn → 归档' },
+          'incomplete': { label: '⚠️ 上次未完成', next: '输入「继续」恢复，或「新需求」归档后开始新任务' },
+        };
+        const guide = stageGuide[stage];
+        if (guide) {
+          console.log(`  当前阶段: ${guide.label}`);
+          console.log(`  下一步: ${guide.next}`);
+          console.log('');
+        }
+        console.log('  流程: 需求确认 → 任务拆分 → 选agent开发 → /code-review → 用户确认 → 归档');
         console.log('');
       } else {
+        // 独立模式：展示角色选择
+        const skills = listSkills();
+        const maxNameLen = Math.max(...skills.map(s => s.meta.name.length));
         console.log('\n[4/4] Skill 选择\n');
         console.log('═══════════════════════════════════════════════════════════');
         console.log('  请选择角色（说出角色名即可）：');
@@ -394,6 +457,118 @@ async function main(): Promise<void> {
         console.log('');
       }
 
+      break;
+    }
+
+    case 'refresh-context': {
+      const rootIndex = args.indexOf('--project-root');
+      const projectRoot = rootIndex !== -1
+        ? path.resolve(args[rootIndex + 1])
+        : (args[1] && !args[1].startsWith('--') ? path.resolve(args[1]) : getProjectRoot());
+
+      setProjectRoot(projectRoot);
+
+      const { refreshContextMd } = await import('./prompts-generator.js');
+      const result = refreshContextMd(projectRoot);
+
+      if (result.updated) {
+        console.log(`✅ context.md 已更新: ${result.changes.join(', ')}`);
+      } else {
+        console.log('✅ context.md 无需更新（技术栈无变化）');
+      }
+      break;
+    }
+
+    case 'advance-stage': {
+      const rootIndex = args.indexOf('--project-root');
+      const projectRoot = rootIndex !== -1
+        ? path.resolve(args[rootIndex + 1])
+        : (args[1] && !args[1].startsWith('--') ? path.resolve(args[1]) : getProjectRoot());
+
+      setProjectRoot(projectRoot);
+
+      const toIndex = args.indexOf('--to');
+      const targetStage = toIndex !== -1 ? args[toIndex + 1] : '';
+
+      const promptsDir = getPromptsDir();
+      const statePath = path.join(promptsDir, 'task-state.json');
+
+      let state: any = { stage: 'spec-pending', history: [] };
+      try {
+        if (fs.existsSync(statePath)) {
+          state = JSON.parse(fs.readFileSync(statePath, 'utf-8'));
+        }
+      } catch { /* use default */ }
+
+      const validStages = ['spec-pending', 'confirmed', 'task-planning', 'developing', 'reviewing', 'user-confirming', 'completed', 'archived'];
+      const currentStage = state.stage || 'spec-pending';
+
+      if (!targetStage) {
+        // 自动推进到下一阶段
+        const stageOrder = ['spec-pending', 'confirmed', 'task-planning', 'developing', 'reviewing', 'user-confirming', 'completed', 'archived'];
+        const currentIndex = stageOrder.indexOf(currentStage);
+        if (currentIndex === -1 || currentIndex >= stageOrder.length - 1) {
+          console.log(`当前阶段: ${currentStage}（无法自动推进）`);
+          console.log(`可用阶段: ${validStages.join(', ')}`);
+          console.log(`用法: pmcp advance-stage --to <stage>`);
+          break;
+        }
+        const nextStage = stageOrder[currentIndex + 1];
+
+        // confirmed 阶段需要计算 focus-spec hash
+        if (nextStage === 'confirmed') {
+          const specPath = path.join(promptsDir, 'focus-spec.md');
+          if (fs.existsSync(specPath)) {
+            const crypto = await import('node:crypto');
+            const specContent = fs.readFileSync(specPath, 'utf-8');
+            state.contractHash = crypto.createHash('sha256').update(specContent).digest('hex');
+          }
+        }
+
+        state.stage = nextStage;
+        state.history = state.history || [];
+        state.history.unshift({
+          stage: nextStage,
+          entered: new Date().toISOString(),
+          note: `pmcp advance-stage 自动推进: ${currentStage} → ${nextStage}`
+        });
+
+        fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+        console.log(`✅ ${currentStage} → ${nextStage}`);
+      } else {
+        // 手动指定目标阶段
+        if (!validStages.includes(targetStage)) {
+          console.error(`❌ 无效阶段: ${targetStage}`);
+          console.error(`可用阶段: ${validStages.join(', ')}`);
+          process.exit(1);
+        }
+
+        if (targetStage === currentStage) {
+          console.log(`已在 ${targetStage} 阶段，无需转换`);
+          break;
+        }
+
+        // confirmed 阶段需要计算 focus-spec hash
+        if (targetStage === 'confirmed') {
+          const specPath = path.join(promptsDir, 'focus-spec.md');
+          if (fs.existsSync(specPath)) {
+            const crypto = await import('node:crypto');
+            const specContent = fs.readFileSync(specPath, 'utf-8');
+            state.contractHash = crypto.createHash('sha256').update(specContent).digest('hex');
+          }
+        }
+
+        state.stage = targetStage;
+        state.history = state.history || [];
+        state.history.unshift({
+          stage: targetStage,
+          entered: new Date().toISOString(),
+          note: `pmcp advance-stage 手动转换: ${currentStage} → ${targetStage}`
+        });
+
+        fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
+        console.log(`✅ ${currentStage} → ${targetStage}`);
+      }
       break;
     }
 
@@ -524,24 +699,45 @@ async function main(): Promise<void> {
         }
 
         // hooks 使用相对路径（相对于项目根目录）
-        const hookBase = '.prompts-mcp/adapters/claude-code';
+        const hookBase = '.prompts-mcp';
         const newSettings = {
           ...existingSettings,
           hooks: {
             ...(existingSettings.hooks || {}),
+            UserPromptSubmit: [{
+              hooks: [{
+                type: 'command',
+                command: `node ${hookBase}/capture-prompt.cjs`,
+                timeout: 5
+              }]
+            }],
+            PreToolUse: [{
+              matcher: 'Write|Edit',
+              hooks: [{
+                type: 'command',
+                command: `node ${hookBase}/pre-tool-use.cjs`
+              }]
+            }],
             SessionStart: [{
               matcher: '*',
               hooks: [{
                 type: 'command',
-                command: `bash ${hookBase}/session-start.sh`,
+                command: `node ${hookBase}/session-start.cjs`,
                 statusMessage: 'Loading project context...'
               }]
             }],
             PostToolUse: [{
+              matcher: 'Write|Edit',
+              hooks: [{
+                type: 'command',
+                command: `node ${hookBase}/post-write-scan.cjs`,
+                timeout: 10
+              }]
+            }, {
               matcher: '*',
               hooks: [{
                 type: 'command',
-                command: `bash ${hookBase}/normalize-log.sh`,
+                command: `node ${hookBase}/normalize-log.cjs`,
                 timeout: 5
               }]
             }],
@@ -549,7 +745,7 @@ async function main(): Promise<void> {
               matcher: '*',
               hooks: [{
                 type: 'command',
-                command: `bash ${hookBase}/session-end.sh`,
+                command: `node ${hookBase}/session-end.cjs`,
                 statusMessage: 'Finalizing session...',
                 timeout: 30
               }]
@@ -798,10 +994,9 @@ async function main(): Promise<void> {
       const promptsDir = getPromptsDir();
       const { entryId, today } = logDialog(promptsDir, { title, request, changes, decisions, todos });
 
-      console.log('✅ daily 日志已追加');
-      console.log('✅ recent-5 已更新');
-      console.log('✅ log-state.json 已更新');
+      if (todos.length > 0) console.log('✅ todos.md 已追加');
       console.log(`\n📝 Entry-${String(entryId).padStart(3, '0')} (${today}): ${title}`);
+      console.log('💡 daily/recent-5/summary-10 将在 session-end 时由 Shell writer 统一生成');
       break;
     }
 

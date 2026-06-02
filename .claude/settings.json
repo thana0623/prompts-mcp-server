@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .prompts-mcp/adapters/claude-code/capture-prompt.sh",
+            "command": "node .prompts-mcp/capture-prompt.cjs",
             "timeout": 5
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .prompts-mcp/pre-tool-use.sh"
+            "command": "node .prompts-mcp/pre-tool-use.cjs"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .prompts-mcp/adapters/claude-code/session-start.sh",
+            "command": "node .prompts-mcp/session-start.cjs",
             "statusMessage": "Loading project context..."
           }
         ]
@@ -40,8 +40,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .prompts-mcp/hooks/post-write-scan.sh",
+            "command": "node .prompts-mcp/post-write-scan.cjs",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .prompts-mcp/normalize-log.cjs",
+            "timeout": 5
           }
         ]
       }
@@ -52,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .prompts-mcp/adapters/claude-code/session-end.sh",
+            "command": "node .prompts-mcp/session-end.cjs",
             "statusMessage": "Finalizing session...",
             "timeout": 30
           }

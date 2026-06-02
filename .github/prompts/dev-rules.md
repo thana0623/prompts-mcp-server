@@ -20,36 +20,44 @@
 
 ### 1. 一案一结（Lifecycle）
 
-`focus-spec.md` 有完整的 5 阶段生命周期：
+`focus-spec.md` 有完整的 8 阶段生命周期（ECC 工作流）：
 
 ```
-spec-pending → confirmed → completed → archived → spec-pending（新需求）
-                  ↓            ↓
-              开发中遇新问题  开发完成，TODO 未完成
-                  ↓            ↓
-           change-requested  禁写，引导完成 TODO
-                  ↓
-              更新需求 → confirmed
+spec-pending → confirmed → task-planning → developing → reviewing → user-confirming → completed → archived
+     签字         拆任务       选agent开发      审查         用户确认       git+学习        归档
 ```
+
+特殊状态：
+- `change-requested` — 开发中需求变更
+- `incomplete` — 中途退出未完成
 
 #### 阶段定义
 
 | 阶段 | focus-spec | 其他文件 | 含义 |
 |------|-----------|---------|------|
 | spec-pending | 可写 | 拦截 | 需求预检中，AI 正在写 focus-spec |
-| confirmed | 锁定 | IN 范围内可写 | 已签字，开发中 |
+| confirmed | 锁定 | IN 范围内可写 | 已签字，等待任务拆分 |
+| task-planning | 可写（第 5 章） | IN 范围内可写 | 任务拆分中，写入子任务和完成标准 |
+| developing | 锁定 | IN 范围内可写 | ECC agent 开发中 |
+| reviewing | 锁定 | 拦截 | 审查阶段，只读 |
+| user-confirming | 锁定 | 拦截 | 等待用户最终确认 |
+| completed | 锁定 | 拦截 | 开发完成，TODO 待完成 |
 | change-requested | 可写 | 可写 | 需求变更中，用户已授权修改 |
-| completed | 可写 | 拦截 | 开发完成，TODO 待完成 |
 | archived | 不检查 | 放行 | 全部完成，引导新需求 |
+| incomplete | 锁定 | IN 范围内可写 | 中途退出，可恢复 |
 
 #### 阶段转换条件
 
 - **spec-pending → confirmed**：用户签字（输入 `y` 或 `approve`）
-- **confirmed → completed**：开发完成（代码 + 测试 + review + git commit）
+- **confirmed → task-planning**：focus-spec 已签字，开始拆分子任务
+- **task-planning → developing**：任务拆分完成，用户确认后选择 ECC agent 开发
+- **developing → reviewing**：所有子任务开发完成
+- **reviewing → user-confirming**：审查通过（无 CRITICAL 问题）
+- **user-confirming → completed**：用户确认通过
+- **completed → archived**：git commit + /learn + 归档操作完成
 - **confirmed → change-requested**：开发中遇新问题，用户说「需求变更」「改需求」
 - **change-requested → confirmed**：需求更新后重新签字
-- **completed → archived**：focus-spec 的 TODO 全部完成，归档提交
-- **archived → spec-pending**：用户提新需求
+- **developing → incomplete**：会话中途退出（crash/quit）
 
 #### 追加内容规则（关键）
 
@@ -145,17 +153,18 @@ Fast-Track 下：
 
 ---
 
-### 5. 开发工作流（角色协作顺序）
+### 5. 开发工作流（ECC 工作流角色协作）
 
-标准开发周期按以下 Phase 顺序执行，每个 Phase 对应一个角色：
+标准开发周期按以下 Phase 顺序执行，详见 `ecc-workflow.md`：
 
-| Phase | 角色 | 产出 |
-|-------|------|------|
-| Phase 1 | analyst | `focus-spec.md`（需求契约，人类签字确认） |
-| Phase 2 | architect | `plans/<task-id>/`（架构设计、ADR 决策记录） |
-| Phase 3 | backend / frontend | 实现代码 |
-| Phase 4 | review | 审核报告 |
-| Phase 5 | 开发角色 | 测试合并 |
+| Phase | stage | 角色 | 产出 |
+|-------|-------|------|------|
+| Phase 1 | spec-pending → confirmed | analyst | `focus-spec.md`（需求契约，人类签字确认） |
+| Phase 2 | confirmed → task-planning | PMCP 引导 | focus-spec 第 5 章任务拆分 |
+| Phase 3 | task-planning → developing | ECC agent | 实现代码 |
+| Phase 4 | developing → reviewing | code-reviewer + security-reviewer | 审查报告 |
+| Phase 5 | reviewing → user-confirming | PMCP 引导 | 完成情况 vs 完成标准 |
+| Phase 6 | user-confirming → archived | PMCP 引导 | git commit + /learn + 归档 |
 
 **PR 流程（单人开发模式）：**
 

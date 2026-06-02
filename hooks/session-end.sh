@@ -1,22 +1,24 @@
 #!/bin/bash
 # Shared session-end hook (assistant-agnostic)
-# Processes logs then auto-commits
+# Generates dialog summary, then auto-commits
 #
 # Environment variables (set by adapter):
 #   PROJECT_DIR     — project root (default: pwd)
 #   PROMPTS_SUBDIR  — prompts subdirectory (default: .github/prompts)
+#   SESSION_ID      — current session identifier
 
 set -euo pipefail
 
 export PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
 export PROMPTS_SUBDIR="${PROMPTS_SUBDIR:-.github/prompts}"
+export SESSION_ID="${SESSION_ID:-unknown}"
 
 cd "$PROJECT_DIR"
 
-# Step 1: Process JSONL logs into recent-5.md and summary-10.md
+# Step 1: Generate dialog summary from session prompts + git diff
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$SCRIPT_DIR/process-logs.sh" ]; then
-  bash "$SCRIPT_DIR/process-logs.sh" 2>/dev/null || true
+if [ -f "$SCRIPT_DIR/generate-dialog-summary.sh" ]; then
+  bash "$SCRIPT_DIR/generate-dialog-summary.sh" 2>/dev/null || true
 fi
 
 # Step 2: Check for uncommitted changes

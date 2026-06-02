@@ -104,7 +104,7 @@ class PromptsMcpServer {
       tools: [
         {
           name: 'init_prompts',
-          description: '【初始化】扫描目标项目，自动生成原始 prompts 体系（context.md / workflow-log.md / recent-5.md / summary-10.md / todos.md / dev-rules.md / modules/）。已有文件不会覆盖。',
+          description: '【初始化】扫描目标项目，自动生成原始 prompts 体系（context.md / recent-5.md / summary-10.md / todos.md / dev-rules.md / modules/）。已有文件不会覆盖。',
           inputSchema: {
             type: 'object',
             properties: {
@@ -593,7 +593,7 @@ class PromptsMcpServer {
       return {
         content: [{
           type: 'text',
-          text: `✅ 对话日志已记录。\n\n- Entry-${String(entryId).padStart(3, '0')}\n- 日期: ${today}\n- 标题: ${title}\n- daily: 已追加\n- recent-5: 已更新\n- summary-10: 已更新${commitInfo}`,
+          text: `✅ 对话日志已记录。\n\n- Entry-${String(entryId).padStart(3, '0')}\n- 日期: ${today}\n- 标题: ${title}\n- todos: 已追加\n- 💡 daily/recent-5/summary-10 将在 session-end 时统一生成${commitInfo}`,
         }],
       };
     } catch (error: any) {

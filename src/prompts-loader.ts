@@ -37,18 +37,9 @@ function readJsonSafe<T>(filePath: string): T | null {
 export interface LogState {
   nextEntryId: number;
   windowId: string;
-  windowStartEntry: number;
   windowCount: number;
-  windowEntries: WindowEntry[];
-}
-
-export interface WindowEntry {
-  id: number;
-  date: string;
-  request: string;
-  changes: string[];
-  decisions: string[];
-  todos: string[];
+  lastProcessedDate: string;
+  lastProcessedCount: number;
 }
 
 export interface LoadedContext {
@@ -77,6 +68,51 @@ export interface BootstrapResult {
   taskState: TaskState | null;
   hasEcc: boolean;
   archiveHistory: string[];
+  eccWorkflow: string | null;
+}
+
+// ─── Stage Section Extractor ─────────────────────────────────────────
+
+/**
+ * 从 ecc-workflow.md 中提取当前 stage 对应的阶段指南
+ */
+function extractStageSection(workflow: string, stage: string): string | null {
+  // Map stage to Phase section heading
+  const stageToPhase: Record<string, string> = {
+    'spec-pending': 'Phase 1',
+    'confirmed': 'Phase 2',
+    'task-planning': 'Phase 3',
+    'developing': 'Phase 4',
+    'reviewing': 'Phase 5',
+    'user-confirming': 'Phase 6',
+    'completed': 'Phase 6',
+    'incomplete': '中途退出恢复',
+    'change-requested': '需求变更',
+    'archived': '',
+  };
+
+  const phase = stageToPhase[stage];
+  if (!phase) return null;
+
+  const lines = workflow.split('\n');
+  let start = -1;
+  let end = lines.length;
+
+  // Find the section starting with ### Phase N or ### 中途退出恢复 or ### 需求变更
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('### ') && lines[i].includes(phase)) {
+      start = i;
+      continue;
+    }
+    // Find the next ### section (end of current section)
+    if (start >= 0 && lines[i].startsWith('### ') && !lines[i].includes(phase)) {
+      end = i;
+      break;
+    }
+  }
+
+  if (start < 0) return null;
+  return lines.slice(start, end).join('\n').trim();
 }
 
 // ─── Prompt Loaders ──────────────────────────────────────────────────
@@ -109,10 +145,6 @@ export function loadTodos(): LoadedContext {
   return { content: readFileSafe(filePath), path: filePath };
 }
 
-export function loadWorkflowLog(): LoadedContext {
-  const filePath = path.join(getPromptsDir(), 'workflow-log.md');
-  return { content: readFileSafe(filePath), path: filePath };
-}
 
 export function loadDevRules(): LoadedContext {
   const filePath = path.join(getPromptsDir(), 'dev-rules.md');
@@ -182,7 +214,19 @@ export function bootstrap(): BootstrapResult {
   const skills = formatSkillList({ hasEcc });
   const archiveHistory = loadArchiveHistory(3);
 
-  return { context, daily, recent5, summary10, todos, devRules, userRules, logState, modules, skills, focusSpec, taskState, hasEcc, archiveHistory };
+  // ECC 模式下加载 ecc-workflow 技能内容
+  let eccWorkflow: string | null = null;
+  if (hasEcc) {
+    const candidates = [
+      path.join(getPromptsDir(), 'skills', 'ecc-workflow.md'),
+    ];
+    for (const p of candidates) {
+      const content = readFileSafe(p);
+      if (content) { eccWorkflow = content; break; }
+    }
+  }
+
+  return { context, daily, recent5, summary10, todos, devRules, userRules, logState, modules, skills, focusSpec, taskState, hasEcc, archiveHistory, eccWorkflow };
 }
 
 /**
@@ -374,29 +418,110 @@ export function formatBootstrap(result: BootstrapResult): string {
     }
 
     if (result.hasEcc) {
-      // ECC 工作流：跳过角色选择，直接进入需求
-      lines.push('## ⚡ ECC 工作流');
-      lines.push('');
-      lines.push('ECC 已检测 → 直接进入需求阶段，无需选择角色。');
-      lines.push('');
-      lines.push('**完整生命周期：**');
+      const currentStage = result.taskState?.stage || 'spec-pending';
+
+      // ECC 模式：强制生命周期引导
+      lines.push('## ⚡ ECC 生命周期已激活');
       lines.push('');
       lines.push('```');
       lines.push('spec-pending → confirmed → task-planning → developing → reviewing → user-confirming → completed → archived');
       lines.push('     签字         拆任务       选agent开发      审查         用户确认       git+学习        归档');
       lines.push('```');
       lines.push('');
-      lines.push('**每一步做什么：**');
-      lines.push('');
-      lines.push('1. **需求确认** — analyst agent 输出 focus-spec.md → 人类签字');
-      lines.push('2. **任务拆分** — PMCP 引导拆分子任务 + 定义完成标准');
-      lines.push('3. **选择 agent** — PMCP 引导用户选 ECC agent 开发每个子任务');
-      lines.push('4. **开发** — ECC agent 执行，完成后自动检查完成标准');
-      lines.push('5. **审查** — /code-review + /security-scan 对照完成标准逐项检查');
-      lines.push('6. **用户确认** — 展示完成情况，用户确认通过或打回');
-      lines.push('7. **收尾** — git commit + /learn 提取经验 → 归档');
-      lines.push('');
-      lines.push('> 建议：需求归档后输入 `/clear` 清理上下文，再开始新需求。');
+
+      // 阶段特定的强制指令
+      if (currentStage === 'spec-pending') {
+        lines.push('### 🛑 当前阶段：spec-pending — 需求待签字');
+        lines.push('');
+        lines.push('**你必须立即执行以下操作（不可跳过、不可忽略）：**');
+        lines.push('');
+        lines.push('1. 向用户询问本次需求是什么');
+        lines.push('2. 澄清需求后，调用下方 analyst agent 生成 focus-spec.md');
+        lines.push('3. 将 focus-spec.md 内容展示给用户，提示输入 `y` 或 `approve` 签字');
+        lines.push('4. 收到签字后，更新 task-state.json stage 为 `confirmed`');
+        lines.push('5. **签字前禁止 Write/Edit/Bash(写操作)**');
+        lines.push('');
+        lines.push('> 💡 不要问用户"想用什么角色"，直接开始需求澄清。');
+        lines.push('');
+
+        // 嵌入 analyst agent 内容
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '~';
+        const analystPath = path.join(homeDir, '.claude', 'agents', 'analyst.md');
+        const analystContent = readFileSafe(analystPath);
+        if (analystContent) {
+          lines.push('### 📖 Analyst Agent（直接调用，无需查找）');
+          lines.push('');
+          lines.push(analystContent);
+          lines.push('');
+        }
+      } else if (currentStage === 'confirmed') {
+        lines.push('### 📍 当前阶段：confirmed — 需求已签字');
+        lines.push('');
+        lines.push('**你必须立即执行：**');
+        lines.push('');
+        lines.push('1. 读取 focus-spec.md 了解需求');
+        lines.push('2. 拆分子任务，定义完成标准');
+        lines.push('3. 更新 task-state.json stage 为 `task-planning`');
+        lines.push('');
+      } else if (currentStage === 'task-planning') {
+        lines.push('### 📍 当前阶段：task-planning — 任务拆分中');
+        lines.push('');
+        lines.push('**你必须立即执行：**');
+        lines.push('');
+        lines.push('1. 向用户展示子任务列表');
+        lines.push('2. 引导用户选择 ECC agent 开发每个子任务');
+        lines.push('3. 更新 task-state.json stage 为 `developing`');
+        lines.push('');
+      } else if (currentStage === 'developing') {
+        lines.push('### 📍 当前阶段：developing — 开发中');
+        lines.push('');
+        lines.push('**开发完成后：**');
+        lines.push('');
+        lines.push('1. 检查完成标准是否全部满足');
+        lines.push('2. 引导用户输入 `/code-review` 进入审查');
+        lines.push('3. 更新 task-state.json stage 为 `reviewing`');
+        lines.push('');
+      } else if (currentStage === 'reviewing') {
+        lines.push('### 📍 当前阶段：reviewing — 审查中');
+        lines.push('');
+        lines.push('**审查完成后：**');
+        lines.push('');
+        lines.push('1. 展示审查结果');
+        lines.push('2. 更新 task-state.json stage 为 `user-confirming`');
+        lines.push('');
+      } else if (currentStage === 'user-confirming') {
+        lines.push('### 📍 当前阶段：user-confirming — 等待用户确认');
+        lines.push('');
+        lines.push('**用户确认后：**');
+        lines.push('');
+        lines.push('1. git commit');
+        lines.push('2. 更新 task-state.json stage 为 `completed`');
+        lines.push('');
+      } else if (currentStage === 'completed') {
+        lines.push('### 📍 当前阶段：completed — 开发完成');
+        lines.push('');
+        lines.push('**收尾操作：**');
+        lines.push('');
+        lines.push('1. git commit + push');
+        lines.push('2. 更新 task-state.json stage 为 `archived`');
+        lines.push('');
+      } else if (currentStage === 'archived') {
+        lines.push('### ✅ 需求已归档');
+        lines.push('');
+        lines.push('> 当前无活跃需求。描述新需求即可开始新的生命周期。');
+        lines.push('');
+      }
+
+      // 嵌入 ecc-workflow 当前阶段的详细指南
+      if (result.eccWorkflow) {
+        const stageSection = extractStageSection(result.eccWorkflow, currentStage);
+        if (stageSection) {
+          lines.push('### 📖 当前阶段详细指南');
+          lines.push('');
+          lines.push(stageSection);
+          lines.push('');
+        }
+      }
     } else {
       // 传统流程：手动选 skill
       lines.push('## ⚡ 选择你的角色');
@@ -502,6 +627,167 @@ export function formatBootstrap(result: BootstrapResult): string {
     }
     lines.push('');
   }
+
+  return lines.join('\n');
+}
+
+/**
+ * 格式化 bootstrap 结果为精简文本（CLI 专用）
+ * 只输出：Hard Gate 状态、当前阶段、下一步操作、角色列表
+ * 不输出：context.md、recent-5.md、summary-10.md、todos.md、dev-rules.md
+ */
+export function formatBootstrapCompact(result: BootstrapResult): string {
+  const lines: string[] = [];
+
+  lines.push('# 🚀 Prompts MCP Server - Bootstrap');
+  lines.push('');
+
+  // ─── Hard Gate: 需求预检 ───
+  const isArchived = result.taskState?.stage === 'archived';
+
+  if (!isArchived) {
+    lines.push('## 🛑 HARD GATE：需求预检');
+    lines.push('');
+  }
+
+  if (!isArchived) {
+    if (!result.focusSpec || !result.focusSpec.content) {
+      lines.push('### ❌ focus-spec.md 不存在');
+      lines.push('');
+      lines.push('> 请描述需求，我来生成 focus-spec.md 契约文档。');
+      lines.push('');
+    } else {
+      const specContent = result.focusSpec.content;
+      const isConfirmed = specContent.includes('status: confirmed') || specContent.includes('status: approved');
+
+      if (!isConfirmed) {
+        lines.push('### ⚠️ focus-spec.md 存在但未签字确认');
+        lines.push('');
+        lines.push('> 请审查契约并输入 y/approve 签字。');
+        lines.push('');
+      } else {
+        lines.push('### ✅ focus-spec.md 已签字确认');
+        lines.push('');
+        lines.push('**契约已锁定。后续编码禁止修改已确认的断言。**');
+        lines.push('');
+      }
+    }
+
+    // 阶段感知引导
+    const stage = result.taskState?.stage || 'spec-pending';
+    lines.push('### 📍 当前阶段');
+    lines.push('');
+
+    const stageGuide: Record<string, { label: string; next: string; action: string }> = {
+      'spec-pending': {
+        label: '⏳ 需求待签字',
+        next: '签字确认 focus-spec.md',
+        action: '输入 `y` 或 `approve` 签字',
+      },
+      'confirmed': {
+        label: '✅ 需求已签字',
+        next: '拆分任务 + 定义完成标准',
+        action: '输入 `analyst` 开始任务拆分',
+      },
+      'task-planning': {
+        label: '📋 任务拆分中',
+        next: '选择 ECC agent 开始开发',
+        action: '确认任务拆分后选择 agent',
+      },
+      'developing': {
+        label: '🔨 开发中',
+        next: '完成开发后审查',
+        action: '输入 `/code-review` 进入审查',
+      },
+      'reviewing': {
+        label: '🔍 审查中',
+        next: '审查通过后用户确认',
+        action: '等待审查完成',
+      },
+      'user-confirming': {
+        label: '👤 等待用户确认',
+        next: '用户确认后归档',
+        action: '输入 `通过` 确认',
+      },
+      'completed': {
+        label: '🎉 开发完成',
+        next: '归档',
+        action: '输入 `归档` 完成',
+      },
+      'incomplete': {
+        label: '⚠️ 上次未完成',
+        next: '继续或开始新需求',
+        action: '输入 `继续` 或 `新需求`',
+      },
+      'archived': {
+        label: '✅ 已归档',
+        next: '开始新需求',
+        action: '描述新需求即可',
+      },
+    };
+
+    const guide = stageGuide[stage];
+    if (guide) {
+      lines.push(`**${guide.label}**`);
+      lines.push(`- 下一步: ${guide.next}`);
+      lines.push(`- 操作: ${guide.action}`);
+      lines.push('');
+    }
+  }
+
+  lines.push('---');
+  lines.push('');
+
+  // 角色选择 + 工作流引导
+  if (result.skills) {
+    const skills = result.skills.split('\n').filter(l => l.startsWith('|') && !l.startsWith('|---') && !l.startsWith('| #'));
+    const skillList: { name: string; desc: string }[] = [];
+    for (const s of skills) {
+      const nameMatch = s.match(/\*\*(\S+)\*\*/);
+      const name = nameMatch ? nameMatch[1] : '';
+      const descMatch = s.match(/\| ([^|]+?) \| v/);
+      const desc = descMatch ? descMatch[1].replace(/\*\*/g, '').trim() : '';
+      if (name) skillList.push({ name, desc });
+    }
+
+    if (result.hasEcc) {
+      const currentStage = result.taskState?.stage || 'spec-pending';
+
+      // ECC 模式：强制生命周期引导
+      lines.push('## ⚡ ECC 生命周期已激活');
+      lines.push('');
+      lines.push('```');
+      lines.push('spec-pending → confirmed → task-planning → developing → reviewing → user-confirming → completed → archived');
+      lines.push('     签字         拆任务       选agent开发      审查         用户确认       git+学习        归档');
+      lines.push('```');
+      lines.push('');
+
+      // 阶段特定的强制指令
+      if (currentStage === 'spec-pending') {
+        lines.push('### 🛑 当前阶段：spec-pending — 需求待签字');
+        lines.push('');
+        lines.push('> 💡 不要问用户"想用什么角色"，直接开始需求澄清。');
+        lines.push('');
+      }
+    } else {
+      // 传统流程：手动选 skill
+      lines.push('## ⚡ 选择你的角色');
+      lines.push('');
+      for (const s of skillList) {
+        lines.push(`- **${s.name}** — ${s.desc}`);
+      }
+      lines.push('');
+    }
+    lines.push('---');
+    lines.push('');
+  }
+
+  // 加载清单（精简版）
+  lines.push('## ✅ 加载清单');
+  lines.push('');
+  lines.push(`✓ context.md: ${result.context.content ? '已加载' : '未找到'}`);
+  lines.push(`✓ Skills: ${result.skills ? '已加载' : '无'}`);
+  lines.push('');
 
   return lines.join('\n');
 }

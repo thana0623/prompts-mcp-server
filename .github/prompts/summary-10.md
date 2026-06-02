@@ -5,7 +5,7 @@
 
 ## W-0001
 
-- Window progress: 9/10
+- Window progress: 87/10
 
 
 ### Carry Forward
@@ -73,174 +73,6 @@ Carry-forward from W-0005:
 
 ---
 
-## W-0006
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0006:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\src\cli.ts, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\src\prompts-loader.ts, C:\admin\Code\Project\prompts-mcp-server\package.json, C:\admin\Code\Project\prompts-mcp-server\adapters\claude-code\session-start.sh, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\adapters\claude-code\session-start.sh
-- Commands: npx pmcp start .; ls -la "C:/admin/Code/Project/prompts-mcp-server/build/" 2>/dev/null | head -20; ls -la "C:/admin/Code/Project/prompts-mcp-server/build/" | grep -i index; ls -la ~/.claude/ 2>/dev/null || echo "No ~/.claude directory found"; npx pmcp new-requirement
-- Total events in window: 33
-
----
-
-## W-0007
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0007:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu
-- Total events in window: 10
-
----
-
-## W-0008
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0008:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0009
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0009:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0010
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0010:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0011
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0011:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\hooks\post-write-scan.sh
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 11
-
----
-
-## W-0012
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0012:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\hooks\post-write-scan.sh, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\pre-tool-use.cjs
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0013
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0013:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\hooks\post-write-scan.sh, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\pre-tool-use.cjs
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0014
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0014:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\hooks\post-write-scan.sh, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\pre-tool-use.cjs, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\dev-rules.md
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0015
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0015:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\hooks\post-write-scan.sh, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\pre-tool-use.cjs, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\dev-rules.md, C:\admin\Code\Project\prompts-mcp-server\src\prompts-loader.ts
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0016
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0016:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\hooks\post-write-scan.sh, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\pre-tool-use.cjs, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\dev-rules.md, C:\admin\Code\Project\prompts-mcp-server\src\prompts-loader.ts
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
-## W-0017
-
-- Window progress: 0/10
-
-
-### Carry Forward
-
-Carry-forward from W-0017:
-- Files modified: C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\task-state.json, C:\admin\Code\Project\prompts-mcp-server\hooks\scan-secrets.sh, C:\admin\Code\Project\prompts-mcp-server\.git\hooks\pre-commit, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\hooks\post-write-scan.sh, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\pre-tool-use.cjs, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\dev-rules.md, C:\admin\Code\Project\prompts-mcp-server\src\prompts-loader.ts, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\plans\review-workflow-and-dialog-logging\architecture.md
-- Commands: npx pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/logs/dialogs/" 2>/dev/null | head -20; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== 4. Skills 文件检查 ===" && for f in analyst architect backend frontend review; do [ -f ".github/prompts/skills/$f.md" ] && echo "✓ $f.md" || echo; cd "C:/admin/Code/Project/prompts-mcp-server" && echo "=== recent-5.md 最后事件 ===" && tail -6 .github/prompts/recent-5.md && echo "" && echo "=== summary-10.md 窗口状态 ===" && grep "Window progress" .githu; cd "C:/admin/Code/Project/prompts-mcp-server" && git status
-- Total events in window: 10
-
----
-
 ## W-0018
 
 - Window progress: 0/10
@@ -255,5 +87,36 @@ Carry-forward from W-0018:
 ---
 
 ## W-0019
+
+- Window progress: 0/10
+
+
+### Carry Forward
+
+Carry-forward from W-0019:
+- Dialogs: 10 sessions
+- Key topics: 对话（无文件修改）; 对话（无文件修改）
+
+---
+
+## W-0020
+
+- Window progress: 0/10
+
+## W-0020
+
+- 窗口进度: 4/10
+
+
+### Carry Forward
+
+Carry-forward from W-0020:
+- Files modified: C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\capture-prompt.cjs, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\post-write-scan.cjs, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\normalize-log.cjs, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\session-start.cjs, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\session-end.cjs, C:\admin\Code\Project\prompts-mcp-server\.claude\settings.json, C:\admin\Code\Project\prompts-mcp-server\.prompts-mcp\adapters\claude-code\settings.json, C:\admin\Code\Project\prompts-mcp-server\src\cli.ts, test.ts, C:\admin\Code\Project\prompts-mcp-server\.github\prompts\focus-spec.md
+- Commands: pmcp start; ls -la "C:/admin/Code/Project/prompts-mcp-server/.prompts-mcp/" 2>/dev/null | head -30; ls -la "C:/admin/Code/Project/prompts-mcp-server/hooks/" 2>/dev/null | head -20; ls -la ~/.claude/agents/ 2>/dev/null | head -10; ls -la ~/.claude/rules/ecc/ 2>/dev/null | head -10
+- Total events in window: 87
+
+---
+
+## W-0021
 
 - Window progress: 0/10

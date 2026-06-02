@@ -141,9 +141,23 @@ pmcp start
 
 如检测到 ECC 已安装（`~/.claude/rules/ecc/` 存在），展示精简版 ECC 能力引导，包括可用命令和 PMCP + ECC 分工说明。未安装则跳过此步骤。
 
-#### 阶段 3：Skill 选择
+#### 阶段 3：角色选择
 
-启动后展示 7 个内置角色：
+启动后根据 ECC 是否安装展示不同角色列表：
+
+**ECC 模式（角色由 ECC agents 统一管理）：**
+
+| 角色 | 类型 | 职责 |
+|------|------|------|
+| analyst | PMCP | 需求分析、场景还原、边界枚举、输出 focus-spec.md |
+| backend | PMCP | API 设计、数据库、服务端架构 |
+| frontend | PMCP | 企业级前端 UI 开发 |
+| architect | ECC | 架构一致性、模块边界、API 规范 |
+| review | ECC | 代码审查、架构一致性检测 |
+| backend-java | ECC | SpringBoot 后端开发 |
+| database-handler | ECC | 数据库操作、数据清洗 |
+
+**独立模式（PMCP Skills 全部可用）：**
 
 | # | Skill | 职责 |
 |---|-------|------|
@@ -364,105 +378,341 @@ echo '{"tool_name":"Write","tool_input":{"file_path":".github/prompts/focus-spec
 ### 分层管理
 
 ```
+~/.claude/agents/              # ECC agents（ECC 模式下优先使用）
 ~/.pmcp/skills/
   core/     # 核心 skill（随 npm 包分发，只读）
   custom/   # 用户自定义 skill（跨项目复用）
 
 your-project/.github/prompts/skills/
-  # 项目级 skill（优先级最高）
+  # 项目级 skill（ECC 未安装时使用）
+```
+
+### 角色分配策略
+
+```
+ECC 已安装:
+  PMCP 角色 → analyst, backend, frontend（从 ~/.claude/agents/ 加载）
+  ECC 角色  → architect, review, backend-java, database-handler（从 ~/.claude/agents/ 加载）
+  ECC 工具  → tdd-guide, planner, security-reviewer（从 ~/.claude/agents/ 加载）
+
+ECC 未安装:
+  PMCP 角色 → 全部 7 个（从 .github/prompts/skills/ 加载）
 ```
 
 ### Skill 生命周期
 
 ```
 创建 → 同步到项目 → AI 加载执行 → 会话结束更新学习记录 → 导出回全局仓库
+                                                              ↓
+                                                    /learn 提取模式
+                                                    → 追加到 skill 学习记录
 ```
 
 ### 内置 Skills（7 个）
 
-| Skill | 图标 | 职责 | 版本 |
-|-------|------|------|------|
-| analyst | 📋 | 需求分析、场景还原、边界枚举、focus-spec 输出 | v1 |
-| architect | 🏗️ | 架构一致性、模块边界、API 规范、技术债务控制 | v2 |
-| backend-java | ☕ | SpringBoot 后端开发 | v1 |
-| backend | 🔧 | API 设计、数据库、服务端架构 | v1 |
-| frontend | 🎨 | 企业级前端 UI，商业产品质感 | v2 |
-| review | 🔍 | 代码审查、命名规范、DTO 污染检测 | v2 |
-| database-handler | 🗄️ | 数据库数据插入/修改、需求定义、数据清洗、导入备份与验证 | v1 |
+| Skill | 图标 | 职责 | ECC 模式 | 独立模式 |
+|-------|------|------|----------|----------|
+| analyst | 📋 | 需求分析、场景还原、边界枚举、focus-spec 输出 | ✅ ECC agent | ✅ PMCP skill |
+| architect | 🏗️ | 架构一致性、模块边界、API 规范、技术债务控制 | → ECC agent | ✅ PMCP skill |
+| backend-java | ☕ | SpringBoot 后端开发 | → ECC agent | ✅ PMCP skill |
+| backend | 🔧 | API 设计、数据库、服务端架构 | ✅ ECC agent | ✅ PMCP skill |
+| frontend | 🎨 | 企业级前端 UI，商业产品质感 | ✅ ECC agent | ✅ PMCP skill |
+| review | 🔍 | 代码审查、命名规范、DTO 污染检测 | → ECC agent | ✅ PMCP skill |
+| database-handler | 🗄️ | 数据库数据插入/修改、需求定义、数据清洗、导入备份与验证 | → ECC agent | ✅ PMCP skill |
+
+> **→ ECC agent** 表示该角色由 ECC 的 `~/.claude/agents/<name>.md` 接管，PMCP 版本不加载。
 
 ---
 
 ## ECC 集成
 
-PMCP 可与 [ECC (Everything Claude Code)](https://github.com/anthropics/ecc) 配合使用。PMCP 管「做什么」（需求契约 + 上下文持久化），ECC 管「怎么做」（开发流程 + 质量门禁）。
+PMCP 可与 [ECC (Everything Claude Code)](https://github.com/anthropics/ecc) 配合使用。
 
-### 自动检测与工作流
+**核心定位：PMCP 管「做什么」，ECC 管「怎么做」。**
 
-`pmcp start` 自动检测 ECC 是否已安装（检查 `~/.claude/rules/ecc/` 目录）。
+- **PMCP** = 项目上下文生命周期（需求门控、上下文加载、日志、模块记录）
+- **ECC** = 开发执行方法论（agents、rules、TDD、审查、安全扫描）
 
-- **已安装** → 进入 ECC 工作流（自动串联 PMCP + ECC 能力）
-- **未安装** → 走传统 PMCP 流程（手动选 skill → 开发）
+### 自动检测
 
-### ECC 工作流
+`pmcp start` 自动检测 ECC（检查 `~/.claude/rules/ecc/` 目录）：
+- **已安装** → 角色系统统一到 ECC agents，展示 ECC 工作流引导
+- **未安装** → 使用 PMCP 原有 Skills 系统，走传统流程
 
+### 角色系统统一
+
+ECC 存在时，角色由 ECC agents 统一管理，PMCP Skills 保留作为独立模式后备：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    角色分配                                   │
+├─────────────────────────────────────────────────────────────┤
+│  PMCP 角色（需求 + 领域专精）         来源                    │
+│  ─────────────────────────────────────────────────────────  │
+│  analyst         需求分析师          ~/.claude/agents/       │
+│  backend         后端开发专家        ~/.claude/agents/       │
+│  frontend        前端 UI 工程师      ~/.claude/agents/       │
+│                                                             │
+│  ECC 角色（架构 + 审查 + TDD）        来源                    │
+│  ─────────────────────────────────────────────────────────  │
+│  architect       系统架构师          ~/.claude/agents/       │
+│  review          代码审查员          ~/.claude/agents/       │
+│  backend-java    SpringBoot 后端     ~/.claude/agents/       │
+│  database-handler 数据库处理员       ~/.claude/agents/       │
+│  tdd-guide       TDD 驱动           ~/.claude/agents/       │
+│  planner         实现规划            ~/.claude/agents/       │
+│  security-reviewer 安全审查          ~/.claude/agents/       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+> 未安装 ECC 时，PMCP 的 7 个 Skills 全部可用（原有行为不变）。
+
+### 全流程引导（增强版）
+
+PMCP 做「项目经理」引导全流程，ECC agents 做「执行者」。每一步告诉你：**做什么、输入什么、看到什么、下一步是什么。**
+
+```
+spec-pending → confirmed → task-planning → developing → reviewing → user-confirming → completed → archived
+     签字         拆任务       选agent开发      审查         用户确认       git+学习        归档
+```
+
+---
+
+#### Phase 0：启动
+
+```bash
+pmcp start
+```
+
+**你会看到：**
+- 上下文加载摘要（技术栈、最近活动、待办）
+- Hard Gate 状态（focus-spec 是否已签字）
+- **当前阶段 + 下一步操作提示**
+- 归档历史摘要（最后 1-3 条，轻量不污染上下文）
+- 角色列表（PMCP 角色 + ECC 角色）
+
+**你该做什么：**
+- 如果有未完成需求（`incomplete`），输入 `继续` 或 `新需求`
+- 如果是新需求，输入 `analyst` 开始 Phase 1
+- 如果 focus-spec 已签字，按提示进入下一阶段
+
+---
+
+#### Phase 1：需求门控（analyst agent）— stage: spec-pending → confirmed
+
+> **触发条件：** 新需求、新模块、换一个任务
+> **核心原则：** 未签字前，禁止一切写操作
+
+```
+你输入：analyst
+AI 执行：
+  1. 场景还原 — 谁、什么、什么时候、为什么
+  2. 边界枚举 — IN 范围 / OUT 范围
+  3. 黑名单 — 禁止触碰的文件/模块
+  4. 断言清单 — 可验证的验收标准
+  5. 输出 focus-spec.md
+```
+
+**你会看到：** STOP — 契约文档等待人类签字
+**你该做什么：** 输入 `y` 或 `approve` 签字
+
+**签字后：**
+- `task-state.json` 从 `spec-pending` → `confirmed`
+- SHA256 契约锁定，focus-spec 不可篡改
+
+---
+
+#### Phase 2：任务拆分（PMCP 引导）— stage: confirmed → task-planning
+
+> **触发条件：** focus-spec 已签字
+> **核心原则：** 拆分子任务 + 定义完成标准，为每个子任务分配 ECC agent
+
+```
+PMCP 引导：
+  1. 读取 focus-spec.md 的断言清单
+  2. 拆分为可独立开发的子任务
+  3. 为每个子任务定义完成标准
+  4. 为每个子任务建议 ECC agent
+  5. 写入 focus-spec.md 第 5 章「任务拆分」
+```
+
+**你会看到：**
+```
+子任务拆分：
+  T1: [任务描述] → 建议: backend agent → 完成标准: [标准]
+  T2: [任务描述] → 建议: frontend agent → 完成标准: [标准]
+  T3: [任务描述] → 建议: architect agent → 完成标准: [标准]
+```
+
+**你该做什么：**
+- 审查任务拆分是否合理
+- 确认后进入开发阶段
+
+---
+
+#### Phase 3：选择 ECC agent 开发 — stage: task-planning → developing
+
+> **触发条件：** 任务拆分完成
+> **核心原则：** PMCP 引导用户为每个子任务选择 ECC agent
+
+```
+PMCP 引导：
+  「子任务 T1：xxx，建议使用 backend agent，确认？」
+  用户确认 → 加载 backend agent → 开发
+  开发完成 → 自动检查完成标准
+  → 循环直到所有子任务完成
+```
+
+**可用 ECC agents：**
+
+| Agent | 职责 |
+|-------|------|
+| analyst | 需求分析、场景还原 |
+| architect | 系统架构、模块边界 |
+| backend | API 设计、数据库、服务端 |
+| frontend | 企业级前端 UI |
+| review | 代码审查 |
+| tdd-guide | 测试驱动开发 |
+| planner | 实现规划 |
+| security-reviewer | 安全审查 |
+
+**你该做什么：**
+- 确认 agent 选择
+- 观察开发过程
+- 每个子任务完成后检查完成标准
+
+---
+
+#### Phase 4：审查 — stage: developing → reviewing
+
+> **触发条件：** 所有子任务开发完成
+> **核心原则：** 对照完成标准逐项检查，审查阶段禁止写入
+
+```bash
+/code-review      # 代码质量审查
+/security-scan    # 安全漏洞扫描
+```
+
+**AI 执行：**
+- code-reviewer agent 检查代码质量
+- security-reviewer agent 扫描漏洞
+- 对照 focus-spec 第 5 章完成标准逐项检查
+
+**审查结果：**
+
+| 级别 | 含义 | 行动 |
+|------|------|------|
+| CRITICAL | 安全漏洞或数据丢失风险 | **必须修复** |
+| HIGH | Bug 或重大质量问题 | **建议修复** |
+| MEDIUM | 可维护性问题 | 考虑修复 |
+| LOW | 风格建议 | 可选 |
+
+**你该做什么：**
+- 确保无 CRITICAL 问题
+- 有 CRITICAL → 回到 Phase 3 修复
+- 无 CRITICAL → 进入用户确认
+
+---
+
+#### Phase 5：用户确认 — stage: reviewing → user-confirming
+
+> **触发条件：** 审查通过
+> **核心原则：** 用户最终确认，展示完成情况 vs 完成标准
+
+**PMCP 展示：**
+```
+完成情况：
+  ✅ T1: [任务] — 完成标准已满足
+  ✅ T2: [任务] — 完成标准已满足
+  ⚠️ T3: [任务] — 完成标准部分满足（缺少 xxx）
+
+整体评估：2/3 完成，1 项需补充
+```
+
+**你该做什么：**
+- 输入 `通过` → 进入收尾
+- 描述问题 → 回到 Phase 3 修复
+
+---
+
+#### Phase 6：收尾 — stage: user-confirming → completed → archived
+
+**PMCP 自动执行：**
+- git commit 所有变更
+- `/learn` 提取可复用模式 → 追加到 PMCP skill 学习记录
+- `focus-spec.md` → `focus-spec-history/`（移走，不留在主目录）
+- 追加摘要到 `archive-index.md`（一行记录）
+- `task-state.json` → `archived`
+- 日志处理 → 更新 recent-5.md + summary-10.md
+
+**PMCP 提示：**
+```
+✅ 需求已归档：ecc-pmcp-integration
+📦 归档摘要已追加到 archive-index.md
+💡 建议输入 /clear 清理上下文，再开始新需求。
+```
+
+---
+
+#### 中途退出恢复 — stage: incomplete
+
+> **场景：** 开发到一半关闭了终端
+
+**下次启动时：**
 ```
 pmcp start
-  │
-  ├─ 检测 ECC
-  │   ├─ YES → ECC 工作流（见下）
-  │   └─ NO  → 传统流程（选 skill → 开发）
-  │
-  ▼
-① PMCP: 选角色
-   analyst / architect / backend / frontend / ...
-   → 加载上下文 + focus-spec
-
-② PMCP: 需求门控（Hard Gate）
-   analyst 输出 focus-spec.md → 人类签字确认
-   → 未签字前禁止写业务代码
-
-③ ECC: 规划（/plan）
-   planner agent 生成实现计划
-   → 识别依赖、风险、分阶段
-
-④ ECC: 测试驱动开发（/tdd）
-   tdd-guide 驱动 RED → GREEN → REFACTOR
-   → 80%+ 测试覆盖率
-
-⑤ ECC: 代码审查（/code-review）
-   code-reviewer agent 检查质量
-   → CRITICAL 必须修复，HIGH 建议修复
-
-⑥ ECC: 安全扫描（/security-scan）
-   security-reviewer agent 检查漏洞
-   → OWASP Top 10 + 硬编码密钥检测
-
-⑦ PMCP: 记录 + 提交
-   自动日志 → module-log → git commit
+  → 检测到 task-state.stage = incomplete
+  → 提示：「检测到未完成需求：xxx，当前阶段：开发中」
+  → 询问：「继续上次需求？还是开始新需求？」
 ```
+
+**你该做什么：**
+- 输入 `继续` → 恢复到上次阶段
+- 输入 `新需求` → 归档上次（标记为 incomplete）→ 开始新需求
+
+---
+
+### 可选分支流程
+
+| 场景 | 命令 | 说明 |
+|------|------|------|
+| 构建失败 | `/build-fix` | build-error-resolver agent 修复 |
+| 覆盖率不足 | `/test-coverage` | 补充测试用例 |
+| 重构需求 | `/refactor-clean` | refactor-cleaner agent 清理 |
+| 需求变更 | 说出「需求变更」 | task-state 回退到 change-requested → 重新签字 |
+| 提取经验 | `/learn` | 保存模式到 skill 学习记录 |
+| 技能健康 | `/skill-health` | 审计冲突、冗余、质量 |
+| 会话恢复 | `/save-session` | 保存当前进度 |
 
 ### 分工模型
 
 | 职责 | PMCP | ECC |
 |------|------|-----|
-| 需求契约 | `focus-spec.md` + Hard Gate | — |
-| 角色技能 | analyst / architect / backend / ... | — |
-| 上下文加载 | `pmcp bootstrap` | — |
+| 上下文加载 | `pmcp start` / `pmcp bootstrap` | — |
+| 需求门控 | `focus-spec.md` + Hard Gate | — |
+| 角色系统 | analyst / backend / frontend | architect / review / tdd-guide / ... |
 | 对话日志 | recent-5.md + summary-10.md | — |
+| 模块记录 | `pmcp module-log` | — |
 | 实现规划 | — | `/plan` (planner agent) |
 | 测试驱动 | — | `/tdd` (tdd-guide agent) |
 | 代码审查 | — | `/code-review` (code-reviewer agent) |
 | 安全扫描 | — | `/security-scan` (security-reviewer agent) |
 | 构建修复 | — | `/build-fix` (build-error-resolver agent) |
-| 持续学习 | — | `/learn` |
+| 持续学习 | skill 学习记录 | `/learn` + `/skill-create` |
 
 ### 未安装 ECC
 
-走传统 PMCP 流程：
+走传统 PMCP 流程（功能完整，无需 ECC）：
 
 ```
-pmcp start → 选角色 → 需求门控 → 开发 → git commit
+pmcp start
+  → 选角色（7 个 PMCP Skills 全部可用）
+  → 需求门控（analyst → focus-spec → 签字）
+  → 手动开发
+  → git commit
 ```
+
+PMCP Skills 包含完整的契约锁死流程（Phase 0 → Phase 1 → Phase 2），独立使用时功能不缺失。
 
 ---
 
