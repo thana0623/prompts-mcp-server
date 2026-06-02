@@ -1,6 +1,6 @@
 {
   "name": "pmcp-server",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "通用 MCP Server — 自动生成项目 prompts 体系、传递链日志、模块记录、需求澄清与计划生成。可接入任意项目。",
   "type": "module",
   "main": "build/index.js",
